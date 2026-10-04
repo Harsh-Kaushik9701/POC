@@ -1,0 +1,60 @@
+/* Kiosk: a wall-mounted tablet. Deliberately dark, high-contrast, big touch targets (min 64px). */
+.kiosk {
+  --k-bg: #121a22; --k-panel: #1c2731; --k-panel-2: #26333f; --k-line: #33424f; --k-ink: #f1f4f7; --k-muted: #9aa8b5;
+  --k-go: #2e9e5e; --k-stop: #d54141; --k-wait: #d08e1c; --k-ind: #3f78cc; --k-brk: #6f7a8c; --k-tape: #f2c430;
+  min-height: 100vh; background: var(--k-bg); color: var(--k-ink); font-family: var(--f-body);
+  display: grid; grid-template-rows: auto 1fr auto; color-scheme: dark;
+}
+.kiosk button { cursor: pointer; font: inherit; color: inherit; }
+.k-bar { display: flex; justify-content: space-between; align-items: center; padding: 12px 20px; border-bottom: 1px solid var(--k-line); gap: 12px; flex-wrap: wrap; }
+.k-bar b { font-family: var(--f-display); font-size: 22px; letter-spacing: .3px; }
+.k-bar b i { font-style: normal; background: var(--k-tape); color: #1b1a10; padding: 0 5px; border-radius: 3px; margin-right: 8px; }
+.k-net { font-family: var(--f-mono); font-size: 12.5px; padding: 3px 10px; border-radius: 99px; border: 1px solid var(--k-line); }
+.k-net.off { background: #4a2a12; border-color: var(--k-wait); }
+.k-body { padding: 20px; display: grid; align-content: start; gap: 18px; max-width: 1100px; width: 100%; margin: 0 auto; }
+.k-attract { display: grid; place-items: center; text-align: center; gap: 14px; padding: 40px 10px; }
+.k-clock { font-family: var(--f-mono); font-size: clamp(64px, 12vw, 120px); font-weight: 500; line-height: 1; }
+.k-date { color: var(--k-muted); font-size: 18px; }
+.k-tap { font-family: var(--f-display); font-size: clamp(30px, 5vw, 44px); font-weight: 600; margin-top: 18px; }
+.k-tap::before { content: ""; display: block; width: 96px; height: 96px; margin: 0 auto 12px; border-radius: 50%; border: 3px solid var(--k-tape); box-shadow: 0 0 0 10px rgba(242, 196, 48, .12), 0 0 0 22px rgba(242, 196, 48, .06); animation: k-pulse 2.4s ease-in-out infinite; }
+@keyframes k-pulse { 50% { box-shadow: 0 0 0 16px rgba(242, 196, 48, .16), 0 0 0 32px rgba(242, 196, 48, .05); } }
+.k-sub { color: var(--k-muted); font-size: 16px; }
+.k-who { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.k-ava { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; font-family: var(--f-display); font-weight: 700; font-size: 26px; color: #fff; flex: none; overflow: hidden; }
+.k-name { font-family: var(--f-display); font-size: 34px; font-weight: 600; line-height: 1.05; }
+.k-state { display: inline-flex; align-items: center; gap: 8px; font-size: 17px; margin-top: 4px; }
+.k-state .dot { width: 12px; height: 12px; border-radius: 3px; }
+.k-meta { color: var(--k-muted); font-size: 15px; font-family: var(--f-mono); }
+.k-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+.k-btn { min-height: 76px; background: var(--k-panel-2); border: 2px solid transparent; border-radius: 12px; padding: 12px 16px; text-align: left; font-size: 20px; font-weight: 600; display: grid; gap: 2px; align-content: center; }
+.k-btn small { font-size: 13.5px; font-weight: 400; color: rgba(241, 244, 247, .78); }
+.k-btn:hover, .k-btn:focus-visible { border-color: var(--k-tape); outline: none; }
+.k-btn.big { grid-column: 1 / -1; min-height: 96px; font-size: 28px; }
+.k-btn.go { background: var(--k-go); } .k-btn.stop { background: var(--k-stop); } .k-btn.wait { background: var(--k-wait); }
+.k-btn.ind { background: var(--k-ind); } .k-btn.brk { background: var(--k-brk); }
+.k-btn:disabled { opacity: .4; cursor: not-allowed; }
+.k-sec { font-family: var(--f-mono); font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--k-muted); }
+.k-task { background: var(--k-panel); border: 2px solid var(--k-line); border-radius: 12px; padding: 12px 14px; text-align: left; display: grid; gap: 3px; min-height: 92px; }
+.k-task:hover { border-color: var(--k-tape); }
+.k-task b { font-family: var(--f-mono); font-size: 14px; color: var(--k-tape); }
+.k-task span { font-size: 18px; font-weight: 600; }
+.k-task small { color: var(--k-muted); font-size: 13px; }
+.k-search { background: var(--k-panel); border: 2px solid var(--k-line); border-radius: 10px; padding: 12px 14px; font-size: 18px; color: var(--k-ink); width: 100%; }
+.k-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.k-ghost { background: none; border: 2px solid var(--k-line); border-radius: 10px; padding: 10px 16px; font-size: 16px; }
+.k-msg { background: #4a1f22; border: 1px solid var(--k-stop); border-radius: 10px; padding: 12px 16px; font-size: 17px; }
+.k-confirm { border-radius: 18px; padding: 36px 28px; display: grid; gap: 10px; text-align: center; justify-items: center; }
+.k-confirm h2 { font-family: var(--f-display); font-size: clamp(36px, 6vw, 56px); font-weight: 700; }
+.k-confirm p { font-size: 20px; }
+.k-confirm.go { background: #1d4a31; } .k-confirm.stop { background: #4a2024; } .k-confirm.wait { background: #4a3812; } .k-confirm.ind { background: #1d3456; } .k-confirm.brk { background: #343b47; }
+.k-foot { border-top: 1px solid var(--k-line); padding: 10px 20px; display: flex; gap: 10px; justify-content: space-between; flex-wrap: wrap; align-items: center; font-size: 13px; color: var(--k-muted); }
+.k-demo { background: var(--k-panel); border: 1px dashed var(--k-tape); border-radius: 12px; padding: 12px; display: grid; gap: 8px; }
+.k-fobs { display: flex; flex-wrap: wrap; gap: 6px; }
+.k-fob { background: var(--k-panel-2); border: 1px solid var(--k-line); border-radius: 8px; padding: 6px 10px; font-size: 13.5px; text-align: left; }
+.k-fob small { display: block; font-family: var(--f-mono); color: var(--k-muted); font-size: 11px; }
+.k-pin { display: grid; gap: 10px; max-width: 420px; }
+.k-pin input { background: var(--k-panel); border: 2px solid var(--k-line); border-radius: 10px; padding: 12px; font-size: 24px; color: var(--k-ink); font-family: var(--f-mono); letter-spacing: .2em; }
+.k-keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.k-keys button { min-height: 64px; background: var(--k-panel-2); border: 0; border-radius: 10px; font-size: 26px; font-family: var(--f-mono); }
+.k-cam { width: 72px; height: 54px; border-radius: 8px; object-fit: cover; background: #000; border: 1px solid var(--k-line); }
+@media (prefers-reduced-motion: reduce) { .k-tap::before { animation: none; } }

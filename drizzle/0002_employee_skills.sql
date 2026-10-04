@@ -1,0 +1,1 @@
+ALTER TABLE "employees" ADD COLUMN "skills" text[] DEFAULT '{}' NOT NULL;
