@@ -18,7 +18,8 @@ type WState = { kind: string; since: number | null; taskId: string | null; activ
 type Today = { firstIn: number | null; paidS: number; directS: number; indirectS: number; waitingS: number; unallocatedS: number; breakS: number; breakCount: number; finishedCount: number; startCount: number };
 type TLItem = { kind: string; start: number; end: number | null; label: string | null; finished: boolean };
 type Ev = { id: string; employeeId: string; type: string; taskId?: string | null; activityTypeId?: string | null; timeCodeId?: string | null; supersedesEventId?: string | null; credentialId?: string | null; method: "nfc" | "pin"; deviceTime: number; offline: boolean; photoKey?: string | null };
-type Screen = { s: "attract" } | { s: "pin" } | { s: "menu" } | { s: "day" } | { s: "tasks"; mode: "start" | "wait"; codeId?: string; clockOn?: boolean } | { s: "codes" } | { s: "finishOff" } | { s: "confirm"; tone: string; title: string; text: string; undo?: { evId: string; until: number } };
+type RLine = { kind: "in" | "out" | "start" | "end" | "break"; title: string; detail: string; dur?: string };
+type Screen = { s: "attract" } | { s: "pin" } | { s: "menu" } | { s: "day" } | { s: "tasks"; mode: "start" | "wait"; codeId?: string; clockOn?: boolean; banner?: RLine[] } | { s: "codes" } | { s: "finishOff" } | { s: "confirm"; tone: string; title: string; text: string; undo?: { evId: string; until: number }; receipt?: RLine[] };
 
 const LS = { device: "sf-device", roster: "sf-roster", outbox: "sf-outbox" };
 const ls = {
@@ -116,15 +117,23 @@ export function Kiosk({ initialToken }: { initialToken: string | null }) {
     idleTimer.current = setTimeout(() => { setScreen({ s: "attract" }); setEmp(null); setErr(null); setSearch(""); }, ms);
   }, []);
 
-  const identify = useCallback(async (e: Emp, credentialId: string | null, method: "nfc" | "pin") => {
-    setEmp(e); setCred({ id: credentialId, method }); setErr(null); setWstate(null); setToday(null); setTimeline([]);
-    setScreen({ s: "menu" }); resetIdle();
+  const loadState = useCallback(async (employeeId: string) => {
     try {
-      const r = await fetch(`/api/v1/device/state?employeeId=${e.id}`, { headers, cache: "no-store" });
+      const r = await fetch(`/api/v1/device/state?employeeId=${employeeId}`, { headers, cache: "no-store" });
       const j = await r.json();
       setWstate(j.state); setToday(j.today); setTimeline(j.timeline ?? []); setOnline(true);
     } catch { setOnline(false); setWstate({ kind: "unknown", since: null, taskId: null, timeCodeId: null }); }
-  }, [headers, resetIdle]);
+  }, [headers]);
+
+  const identify = useCallback(async (e: Emp, credentialId: string | null, method: "nfc" | "pin") => {
+    setEmp(e); setCred({ id: credentialId, method }); setErr(null); setWstate(null); setToday(null); setTimeline([]);
+    setScreen({ s: "menu" }); resetIdle();
+    await loadState(e.id);
+  }, [loadState, resetIdle]);
+
+  // Builds the "receipt" shown after a tap: what ended (with from → to and duration) and what started.
+  const receiptRef = useRef<(list: { type: string; taskId?: string | null; activityTypeId?: string | null; timeCodeId?: string | null }[]) => RLine[]>(() => []);
+  const lastReceipt = useRef<RLine[]>([]);
 
   const tap = useCallback((uidRaw: string) => {
     const uid = uidRaw.replace(/[^0-9a-f]/gi, "").toUpperCase();
@@ -164,6 +173,8 @@ export function Kiosk({ initialToken }: { initialToken: string | null }) {
   async function send(list: Omit<Ev, "id" | "employeeId" | "method" | "deviceTime" | "offline" | "credentialId">[], confirm: Omit<Extract<Screen, { s: "confirm" }>, "s" | "undo">): Promise<boolean> {
     if (!emp || !cred || busy) return false;
     setBusy(true); setErr(null);
+    const receipt = list[0].type === "VOID" ? [] : receiptRef.current(list);
+    lastReceipt.current = receipt;
     const photoKey = list[0].type === "VOID" ? null : await snap();
     const evs: Ev[] = list.map((x, i) => ({ ...x, id: uuidv7(Date.now() + i), employeeId: emp.id, method: cred.method, credentialId: cred.id, deviceTime: Date.now() + i, offline: false, photoKey: i === 0 ? photoKey : null }));
     try {
@@ -174,15 +185,19 @@ export function Kiosk({ initialToken }: { initialToken: string | null }) {
       if (bad) { setErr(bad.error); setBusy(false); resetIdle(); return false; }
       setOnline(true);
       const last = evs[evs.length - 1];
-      setScreen({ s: "confirm", ...confirm, undo: list[0].type === "VOID" ? undefined : { evId: last.id, until: Date.now() + (roster?.undoSeconds ?? 60) * 1000 } });
-      resetIdle(9000);
+      setScreen({ s: "confirm", ...confirm, receipt, undo: list[0].type === "VOID" ? undefined : { evId: last.id, until: Date.now() + (roster?.undoSeconds ?? 60) * 1000 } });
+      resetIdle(12_000);
+      // Drop finished tasks from the cached list straight away (the full roster refresh follows).
+      const finished = new Set(list.filter((x) => x.type === "TASK_FINISH" && x.taskId).map((x) => x.taskId as string));
+      if (finished.size) setRoster((r) => (r ? { ...r, tasks: r.tasks.filter((t) => !finished.has(t.id)) } : r));
       loadRoster();
+      loadState(emp.id);
     } catch {
       // Offline: queue with device time; the server corrects the clock and flags it.
       const queued = evs.map((e) => ({ ...e, offline: true }));
       const box = [...ls.get<Ev[]>(LS.outbox, []), ...queued];
       ls.set(LS.outbox, box); setOutbox(box); setOnline(false);
-      setScreen({ s: "confirm", ...confirm, text: `${confirm.text} Saved on this tablet; it will send when the connection is back.` });
+      setScreen({ s: "confirm", ...confirm, receipt, text: `${confirm.text} Saved on this tablet; it will send when the connection is back.` });
       resetIdle(7000);
     }
     setBusy(false);
@@ -202,6 +217,49 @@ export function Kiosk({ initialToken }: { initialToken: string | null }) {
   const curCode = codeById(wstate?.timeCodeId);
   const curAct = !curTask ? actById(wstate?.activityTypeId) : null;
   const curLabel = curTask ? `${curTask.code} ${curTask.name}` : curAct ? curAct.name : "your job";
+
+  receiptRef.current = (list) => {
+    const lines: RLine[] = [];
+    const nowMs = appNow;
+    const hmm = (ms: number) => tf.format(new Date(ms));
+    const durMin = (ms: number) => fm(Math.max(0, Math.round(ms / 60000)));
+    const types = list.map((x) => x.type);
+    const k = wstate?.kind ?? "";
+    const running = ["direct", "indirect", "waiting", "break_paid", "break_unpaid"].includes(k) && wstate?.since;
+    const ends = running && types.some((x) => x !== "CLOCK_IN" && x !== "VOID");
+    if (ends && wstate?.since) {
+      const isBreak = k === "break_paid" || k === "break_unpaid";
+      const what = isBreak ? (k === "break_paid" ? "Smoko" : "Lunch") : curTask ? `${curTask.code} ${curTask.name}` : curCode ? curCode.name : curAct ? curAct.name : "Work";
+      const pausedNoReason = list.some((x) => x.type === "TASK_PAUSE" && !x.timeCodeId);
+      const verb = types.includes("TASK_FINISH") ? "Finished" : isBreak ? "Back from" : pausedNoReason ? "Paused" : "Stopped";
+      let detail = `${hmm(wstate.since)} → ${hmm(nowMs)}`;
+      if (k === "direct") {
+        const label = curTask ? `${curTask.code} ${curTask.name}` : curAct?.name;
+        const earlier = timeline.filter((x) => x.kind === "direct" && x.label === label && x.end !== null).reduce((a, x) => a + (x.end! - x.start), 0);
+        if (earlier > 60_000) detail += ` · ${durMin(earlier + nowMs - wstate.since)} on it today`;
+      }
+      lines.push({ kind: isBreak ? "break" : "end", title: `${verb}: ${what}`, detail, dur: durMin(nowMs - wstate.since) });
+    }
+    for (const x of list) {
+      if (x.type === "CLOCK_IN") lines.push({ kind: "in", title: "Clocked on", detail: `${df.format(new Date(nowMs))}`, dur: hmm(nowMs) });
+      else if (x.type === "TASK_START") {
+        const tk = taskById(x.taskId); const ac = actById(x.activityTypeId);
+        lines.push({ kind: "start", title: `Started: ${tk ? `${tk.code} ${tk.name}` : ac ? `${ac.name} (no job)` : "work"}`, detail: tk ? `${tk.projectName} · ${fm(tk.std)} standard` : "Timer running", dur: hmm(nowMs) });
+      } else if ((x.type === "CODE_START" || (x.type === "TASK_PAUSE" && x.timeCodeId))) {
+        const c = codeById(x.timeCodeId);
+        lines.push({ kind: "start", title: `Started: ${c?.name ?? "other work"}`, detail: "Timer running", dur: hmm(nowMs) });
+      } else if (x.type === "BREAK_START") {
+        const c = codeById(x.timeCodeId);
+        lines.push({ kind: "break", title: `${c?.name ?? "Break"} started`, detail: c?.maxMinutes ? `Back by ${hmm(nowMs + c.maxMinutes * 60000)}` : "Tap when you're back", dur: hmm(nowMs) });
+      } else if (x.type === "CLOCK_OUT") {
+        const firstIn = today?.firstIn ?? null;
+        const onWork = (today?.directS ?? 0) * 1000; // includes the running stint up to when the fob was tapped
+        lines.push({ kind: "out", title: "Clocked off", detail: firstIn ? `On ${hmm(firstIn)} → off ${hmm(nowMs)}` : `Off at ${hmm(nowMs)}`, dur: firstIn ? durMin(nowMs - firstIn) : hmm(nowMs) });
+        if (today) lines.push({ kind: "end", title: "Your day", detail: `${today.finishedCount} finished · ${today.breakCount} break${today.breakCount === 1 ? "" : "s"} (${fm(Math.round(today.breakS / 60))})`, dur: `${fm(Math.round(onWork / 60000))} on work` });
+      }
+    }
+    return lines;
+  };
   const fixed = roster?.device.fixedTaskId ? taskById(roster.device.fixedTaskId) : null;
   const inState = wstate?.since ? Math.max(0, Math.floor((appNow - wstate.since) / 60000)) : 0;
   const first = emp?.first ?? "";
@@ -242,7 +300,7 @@ export function Kiosk({ initialToken }: { initialToken: string | null }) {
           curTask && btn(`Finish ${curTask.code}`, curTask.name, "go", () => send([{ type: "TASK_FINISH", taskId: curTask.id }], { tone: "go", title: `Nice one, ${first}`, text: `${curTask.code} marked finished at ${at}. Start your next job or activity.` }), true),
           !curTask && btn(`Finish ${curAct?.name ?? "activity"}`, "Done with this activity", "go", () => send([{ type: "TASK_FINISH", activityTypeId: wstate?.activityTypeId ?? null }], { tone: "go", title: `Nice one, ${first}`, text: `${curAct?.name ?? "Activity"} finished at ${at}. Start your next one.` }), true),
           fixedBtn,
-          btn("Finish & start next", "Mark this done and pick the next", "go", () => { send([curTask ? { type: "TASK_FINISH", taskId: curTask.id } : { type: "TASK_FINISH", activityTypeId: wstate?.activityTypeId ?? null }], { tone: "go", title: "Finished", text: `${curLabel} finished at ${at}.` }).then((ok) => { if (ok) openStart(); }); }),
+          btn("Finish & start next", "Mark this done and pick the next", "go", () => { send([curTask ? { type: "TASK_FINISH", taskId: curTask.id } : { type: "TASK_FINISH", activityTypeId: wstate?.activityTypeId ?? null }], { tone: "go", title: "Finished", text: `${curLabel} finished at ${at}.` }).then((ok) => { if (ok) { setSearch(""); setScreen({ s: "tasks", mode: "start", banner: lastReceipt.current }); } }); }),
           btn("Switch", "Stop this one, start another", "", () => openStart()),
           btn("Waiting on something", "Parts, drawings, machine…", "wait", () => setScreen({ s: "codes" })),
           btn("Pause", "No reason · shows as idle", "", () => send([{ type: "TASK_PAUSE", taskId: curTask?.id ?? null }], { tone: "stop", title: "Paused", text: `${curTask?.code ?? curAct?.name ?? "Work"} paused at ${at}. You're now not on anything.` })),
@@ -299,7 +357,7 @@ export function Kiosk({ initialToken }: { initialToken: string | null }) {
         return (
           <div className={`k-confirm ${screen.tone}`} role="status">
             <h2>{screen.title}</h2>
-            <p>{screen.text}</p>
+            {screen.receipt && screen.receipt.length > 0 ? <Receipt lines={screen.receipt} /> : <p>{screen.text}</p>}
             {err && <div className="k-msg">{err}</div>}
             {screen.undo && now < screen.undo.until && (
               <button className="k-ghost" onClick={() => send([{ type: "VOID", supersedesEventId: screen.undo!.evId }], { tone: "brk", title: "Undone", text: "That tap has been cancelled." })}>
@@ -341,7 +399,8 @@ export function Kiosk({ initialToken }: { initialToken: string | null }) {
         );
       }
       case "tasks": {
-        const all = roster?.tasks ?? [];
+        // Finished jobs stay in the roster while crew-mates are still clocked onto them; don't offer them to start.
+        const all = (roster?.tasks ?? []).filter((t) => t.status !== "done");
         const mine = all.filter((t) => emp?.assigned.includes(t.id));
         const q = search.trim().toLowerCase();
         const match = (t: Task) => !q || `${t.code} ${t.name} ${t.projectCode} ${t.projectName}`.toLowerCase().includes(q);
@@ -365,6 +424,7 @@ export function Kiosk({ initialToken }: { initialToken: string | null }) {
         return (
           <div className="stack">
             {screen.mode === "wait" && <div className="k-sec">Which job are you waiting on?</div>}
+            {screen.banner && screen.banner.length > 0 && <Receipt lines={screen.banner} compact />}
             {screen.mode === "start" && <h2 className="k-name">{screen.clockOn ? `G'day ${first}. What are you starting?` : "What are you starting?"}</h2>}
             {mine.length > 0 && (<><div className="k-sec">Assigned to you</div><div className="k-grid">{mine.map(tile)}</div></>)}
             {screen.mode === "start" && acts.length > 0 && (<>
@@ -451,6 +511,24 @@ export function Kiosk({ initialToken }: { initialToken: string | null }) {
         </div>
       )}
     </div>
+  );
+}
+
+const R_ICON: Record<RLine["kind"], [string, string]> = {
+  in: ["▶", "#2e9e5e"], start: ["▶", "#2e9e5e"], end: ["■", "#d4af37"], out: ["■", "#d54141"], break: ["☕", "#9aa0ad"],
+};
+/** The tap receipt: what ended (from → to, how long) and what started (at what time). */
+function Receipt({ lines, compact = false }: { lines: RLine[]; compact?: boolean }) {
+  return (
+    <ul className={`k-receipt${compact ? " compact" : ""}`}>
+      {lines.map((l, i) => (
+        <li key={i}>
+          <span className="ic" style={{ color: R_ICON[l.kind][1] }} aria-hidden="true">{R_ICON[l.kind][0]}</span>
+          <span className="tx"><b>{l.title}</b><small>{l.detail}</small></span>
+          {l.dur && <span className="du">{l.dur}</span>}
+        </li>
+      ))}
+    </ul>
   );
 }
 

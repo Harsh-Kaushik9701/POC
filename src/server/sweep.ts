@@ -3,6 +3,7 @@ import { db, t } from "@/db";
 import { appNow, fmtTime, localDate } from "@/lib/time";
 import { uuidv7 } from "@/lib/uuid";
 import { loadPolicy, recomputeDay } from "./recompute";
+import { refreshDemoAnchor } from "./clock";
 
 /**
  * Background rules. In production these run on a queue (BullMQ) every minute.
@@ -14,8 +15,9 @@ import { loadPolicy, recomputeDay } from "./recompute";
 const g = globalThis as unknown as { __lastSweep?: number };
 
 export async function sweep(force = false) {
+  await refreshDemoAnchor();
   const now = appNow();
-  if (!force && g.__lastSweep && now - g.__lastSweep < 20_000) return { skipped: true };
+  if (!force && g.__lastSweep && now >= g.__lastSweep && now - g.__lastSweep < 20_000) return { skipped: true };
   g.__lastSweep = now;
   const policy = await loadPolicy();
   const open = await db.select().from(t.attendanceDays).where(eq(t.attendanceDays.isOpen, true));

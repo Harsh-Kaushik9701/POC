@@ -2,6 +2,7 @@ import { and, eq, inArray, isNull, sql, ne, or } from "drizzle-orm";
 import { db, t } from "@/db";
 import { deviceFromRequest, deviceError } from "@/server/device";
 import { appNow } from "@/lib/time";
+import { refreshDemoAnchor } from "@/server/clock";
 
 export const dynamic = "force-dynamic";
 
@@ -10,6 +11,7 @@ export const dynamic = "force-dynamic";
  * open tasks, codes and settings. Never includes pay rates or reports.
  */
 export async function GET(req: Request) {
+  await refreshDemoAnchor();
   const device = await deviceFromRequest(req);
   if (!device) return deviceError();
   const emps = await db.select().from(t.employees).where(and(eq(t.employees.active, true), eq(t.employees.siteId, device.siteId))).orderBy(t.employees.firstName);
