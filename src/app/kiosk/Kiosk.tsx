@@ -12,10 +12,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 type Emp = { id: string; code: string; first: string; last: string; trade: string; colour: string; skills: string[]; tags: { id: string; uid: string; label: string | null }[]; assigned: string[] };
 type Task = { id: string; code: string; name: string; std: number; status: string; priority: number; bay: string | null; activity: string | null; activityCode: string | null; projectCode: string; projectName: string; onIt: string | null };
 type Code = { id: string; code: string; name: string; category: string; isPaid: boolean; requiresTask: boolean; maxMinutes: number | null };
-type Roster = { serverNow: number; org: { name: string }; device: { id: string; name: string; kind: string; fixedTaskId: string | null; photoRequired: boolean; pinFallback: boolean }; undoSeconds: number; employees: Emp[]; tasks: Task[]; codes: Code[] };
-type WState = { kind: string; since: number | null; taskId: string | null; timeCodeId: string | null };
-type Ev = { id: string; employeeId: string; type: string; taskId?: string | null; timeCodeId?: string | null; supersedesEventId?: string | null; credentialId?: string | null; method: "nfc" | "pin"; deviceTime: number; offline: boolean; photoKey?: string | null };
-type Screen = { s: "attract" } | { s: "pin" } | { s: "menu" } | { s: "tasks"; mode: "start" | "wait"; codeId?: string } | { s: "codes" } | { s: "finishOff" } | { s: "confirm"; tone: string; title: string; text: string; undo?: { evId: string; until: number } };
+type Activity = { id: string; code: string; name: string; colour: string };
+type Roster = { serverNow: number; org: { name: string }; device: { id: string; name: string; kind: string; fixedTaskId: string | null; photoRequired: boolean; pinFallback: boolean }; undoSeconds: number; employees: Emp[]; tasks: Task[]; codes: Code[]; activities?: Activity[] };
+type WState = { kind: string; since: number | null; taskId: string | null; activityTypeId?: string | null; timeCodeId: string | null };
+type Today = { firstIn: number | null; paidS: number; directS: number; indirectS: number; waitingS: number; unallocatedS: number; breakS: number; breakCount: number; finishedCount: number; startCount: number };
+type TLItem = { kind: string; start: number; end: number | null; label: string | null; finished: boolean };
+type Ev = { id: string; employeeId: string; type: string; taskId?: string | null; activityTypeId?: string | null; timeCodeId?: string | null; supersedesEventId?: string | null; credentialId?: string | null; method: "nfc" | "pin"; deviceTime: number; offline: boolean; photoKey?: string | null };
+type Screen = { s: "attract" } | { s: "pin" } | { s: "menu" } | { s: "day" } | { s: "tasks"; mode: "start" | "wait"; codeId?: string; clockOn?: boolean } | { s: "codes" } | { s: "finishOff" } | { s: "confirm"; tone: string; title: string; text: string; undo?: { evId: string; until: number } };
 
 const LS = { device: "sf-device", roster: "sf-roster", outbox: "sf-outbox" };
 const ls = {
@@ -48,7 +51,8 @@ export function Kiosk({ initialToken }: { initialToken: string | null }) {
   const [emp, setEmp] = useState<Emp | null>(null);
   const [cred, setCred] = useState<{ id: string | null; method: "nfc" | "pin" } | null>(null);
   const [wstate, setWstate] = useState<WState | null>(null);
-  const [today, setToday] = useState<{ paidS: number; directS: number } | null>(null);
+  const [today, setToday] = useState<Today | null>(null);
+  const [timeline, setTimeline] = useState<TLItem[]>([]);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [search, setSearch] = useState("");
@@ -113,12 +117,12 @@ export function Kiosk({ initialToken }: { initialToken: string | null }) {
   }, []);
 
   const identify = useCallback(async (e: Emp, credentialId: string | null, method: "nfc" | "pin") => {
-    setEmp(e); setCred({ id: credentialId, method }); setErr(null); setWstate(null); setToday(null);
+    setEmp(e); setCred({ id: credentialId, method }); setErr(null); setWstate(null); setToday(null); setTimeline([]);
     setScreen({ s: "menu" }); resetIdle();
     try {
       const r = await fetch(`/api/v1/device/state?employeeId=${e.id}`, { headers, cache: "no-store" });
       const j = await r.json();
-      setWstate(j.state); setToday(j.today); setOnline(true);
+      setWstate(j.state); setToday(j.today); setTimeline(j.timeline ?? []); setOnline(true);
     } catch { setOnline(false); setWstate({ kind: "unknown", since: null, taskId: null, timeCodeId: null }); }
   }, [headers, resetIdle]);
 
@@ -157,8 +161,8 @@ export function Kiosk({ initialToken }: { initialToken: string | null }) {
     } catch { return null; }
   }
 
-  async function send(list: Omit<Ev, "id" | "employeeId" | "method" | "deviceTime" | "offline" | "credentialId">[], confirm: Omit<Extract<Screen, { s: "confirm" }>, "s" | "undo">) {
-    if (!emp || !cred || busy) return;
+  async function send(list: Omit<Ev, "id" | "employeeId" | "method" | "deviceTime" | "offline" | "credentialId">[], confirm: Omit<Extract<Screen, { s: "confirm" }>, "s" | "undo">): Promise<boolean> {
+    if (!emp || !cred || busy) return false;
     setBusy(true); setErr(null);
     const photoKey = list[0].type === "VOID" ? null : await snap();
     const evs: Ev[] = list.map((x, i) => ({ ...x, id: uuidv7(Date.now() + i), employeeId: emp.id, method: cred.method, credentialId: cred.id, deviceTime: Date.now() + i, offline: false, photoKey: i === 0 ? photoKey : null }));
@@ -167,7 +171,7 @@ export function Kiosk({ initialToken }: { initialToken: string | null }) {
       if (r.status === 401) throw new Error("unpaired");
       const j = await r.json();
       const bad = j.results.find((x: { ok: boolean }) => !x.ok);
-      if (bad) { setErr(bad.error); setBusy(false); resetIdle(); return; }
+      if (bad) { setErr(bad.error); setBusy(false); resetIdle(); return false; }
       setOnline(true);
       const last = evs[evs.length - 1];
       setScreen({ s: "confirm", ...confirm, undo: list[0].type === "VOID" ? undefined : { evId: last.id, until: Date.now() + (roster?.undoSeconds ?? 60) * 1000 } });
@@ -182,10 +186,12 @@ export function Kiosk({ initialToken }: { initialToken: string | null }) {
       resetIdle(7000);
     }
     setBusy(false);
+    return true;
   }
 
   const taskById = (id: string | null | undefined) => roster?.tasks.find((t) => t.id === id) ?? null;
   const codeById = (id: string | null | undefined) => roster?.codes.find((c) => c.id === id) ?? null;
+  const actById = (id: string | null | undefined) => roster?.activities?.find((a) => a.id === id) ?? null;
   const breakCode = (paid: boolean) => roster?.codes.find((c) => c.category === "break" && c.isPaid === paid);
   const at = tf.format(new Date(appNow));
 
@@ -194,11 +200,18 @@ export function Kiosk({ initialToken }: { initialToken: string | null }) {
   const st = wstate?.kind ?? "loading";
   const curTask = taskById(wstate?.taskId);
   const curCode = codeById(wstate?.timeCodeId);
+  const curAct = !curTask ? actById(wstate?.activityTypeId) : null;
+  const curLabel = curTask ? `${curTask.code} ${curTask.name}` : curAct ? curAct.name : "your job";
   const fixed = roster?.device.fixedTaskId ? taskById(roster.device.fixedTaskId) : null;
   const inState = wstate?.since ? Math.max(0, Math.floor((appNow - wstate.since) / 60000)) : 0;
   const first = emp?.first ?? "";
 
-  const startTask = (t: Task) => send([{ type: "TASK_START", taskId: t.id }], { tone: "go", title: `Started ${t.code}`, text: `${t.name} · ${t.projectName}. Timer running from ${at}.` });
+  const clockOnFirst = (clockOn?: boolean) => (clockOn ? [{ type: "CLOCK_IN" }] : []);
+  const startTask = (t: Task, clockOn?: boolean) => send([...clockOnFirst(clockOn), { type: "TASK_START", taskId: t.id }],
+    { tone: "go", title: `${clockOn ? `G'day ${first} · ` : ""}Started ${t.code}`, text: `${clockOn ? `Clocked on and s` : "S"}tarted ${t.name} · ${t.projectName} at ${at}. Tracking from now.` });
+  const startActivity = (a: Activity, clockOn?: boolean) => send([...clockOnFirst(clockOn), { type: "TASK_START", activityTypeId: a.id }],
+    { tone: "go", title: `${clockOn ? `G'day ${first} · ` : ""}On ${a.name}`, text: `${clockOn ? "Clocked on and s" : "S"}tarted ${a.name.toLowerCase()} (no job) at ${at}. Tap when you finish or switch.` });
+  const openStart = (clockOn = false) => { setSearch(""); setScreen({ s: "tasks", mode: "start", clockOn }); };
   const menu = (): React.ReactNode => {
     if (!emp) return null;
     const btn = (label: string, sub: string, cls: string, on: () => void, big = false, dis = false) => (
@@ -216,23 +229,29 @@ export function Kiosk({ initialToken }: { initialToken: string | null }) {
       ? btn(`Start ${fixed.code}`, `${fixed.name} · this station`, "go", () => startTask(fixed), true) : null;
     switch (st) {
       case "off":
-        return [btn("Clock on", `Start your shift · ${at}`, "go", () => send([{ type: "CLOCK_IN" }], { tone: "go", title: `G'day ${first}`, text: `Clocked on at ${at}. Now pick a job when you're ready.` }), true)];
+        return [
+          btn("Clock on & start work", `Pick a job or activity · tracking starts ${at}`, "go", () => openStart(true), true),
+          fixed ? btn(`Clock on & start ${fixed.code}`, `${fixed.name} · this station`, "go", () => startTask(fixed, true)) : null,
+          btn("Clock on only", "Pick your work later", "", () => send([{ type: "CLOCK_IN" }], { tone: "go", title: `G'day ${first}`, text: `Clocked on at ${at}. Tap again to start a job or activity.` })),
+        ];
       case "unallocated": case "pre_shift": case "post_shift":
-        return [fixedBtn, btn("Start a job", "Pick from your jobs", "go", () => { setSearch(""); setScreen({ s: "tasks", mode: "start" }); }, !fixedBtn),
+        return [fixedBtn, btn("Start work", "Any job or activity", "go", () => openStart(), !fixedBtn),
           btn("Other work", "Clean-up, maintenance, toolbox, waiting…", "ind", () => setScreen({ s: "codes" })), ...brk, clockOff];
       case "direct":
         return [
-          curTask && btn(`Finish ${curTask.code}`, curTask.name, "go", () => send([{ type: "TASK_FINISH", taskId: curTask.id }], { tone: "go", title: `Nice one, ${first}`, text: `${curTask.code} marked finished at ${at}. Pick your next job when ready.` }), true),
+          curTask && btn(`Finish ${curTask.code}`, curTask.name, "go", () => send([{ type: "TASK_FINISH", taskId: curTask.id }], { tone: "go", title: `Nice one, ${first}`, text: `${curTask.code} marked finished at ${at}. Start your next job or activity.` }), true),
+          !curTask && btn(`Finish ${curAct?.name ?? "activity"}`, "Done with this activity", "go", () => send([{ type: "TASK_FINISH", activityTypeId: wstate?.activityTypeId ?? null }], { tone: "go", title: `Nice one, ${first}`, text: `${curAct?.name ?? "Activity"} finished at ${at}. Start your next one.` }), true),
           fixedBtn,
-          btn("Switch job", "Stop this one and start another", "", () => { setSearch(""); setScreen({ s: "tasks", mode: "start" }); }),
+          btn("Finish & start next", "Mark this done and pick the next", "go", () => { send([curTask ? { type: "TASK_FINISH", taskId: curTask.id } : { type: "TASK_FINISH", activityTypeId: wstate?.activityTypeId ?? null }], { tone: "go", title: "Finished", text: `${curLabel} finished at ${at}.` }).then((ok) => { if (ok) openStart(); }); }),
+          btn("Switch", "Stop this one, start another", "", () => openStart()),
           btn("Waiting on something", "Parts, drawings, machine…", "wait", () => setScreen({ s: "codes" })),
-          btn("Pause job", "No reason · shows as idle", "", () => send([{ type: "TASK_PAUSE", taskId: curTask?.id }], { tone: "stop", title: "Job paused", text: `${curTask?.code ?? "Job"} paused at ${at}. You're now not on a job.` })),
+          btn("Pause", "No reason · shows as idle", "", () => send([{ type: "TASK_PAUSE", taskId: curTask?.id ?? null }], { tone: "stop", title: "Paused", text: `${curTask?.code ?? curAct?.name ?? "Work"} paused at ${at}. You're now not on anything.` })),
           ...brk, clockOff];
       case "indirect": case "waiting":
         return [
           curTask && btn(`Back on ${curTask.code}`, curTask.name, "go", () => startTask(curTask), true),
           fixedBtn,
-          btn("Start a job", "Pick from your jobs", "go", () => { setSearch(""); setScreen({ s: "tasks", mode: "start" }); }, !curTask && !fixedBtn),
+          btn("Start work", "Any job or activity", "go", () => openStart(), !curTask && !fixedBtn),
           btn(`Stop ${curCode?.name.toLowerCase() ?? "this"}`, "You'll show as not on a job", "", () => send([{ type: "CODE_END" }], { tone: "stop", title: "Stopped", text: `Ended at ${at}.` })),
           ...brk, clockOff];
       case "break_paid": case "break_unpaid":
@@ -242,8 +261,9 @@ export function Kiosk({ initialToken }: { initialToken: string | null }) {
         // Offline and we don't know their state: offer everything; the server checks each tap when it syncs.
         return [
           <p key="o" className="k-sub" style={{ gridColumn: "1 / -1" }}>Offline: pick what you&apos;re doing. Your tap is saved and checked when the connection is back.</p>,
-          btn("Clock on", "", "go", () => send([{ type: "CLOCK_IN" }], { tone: "go", title: `G'day ${first}`, text: `Clocked on at ${at}.` })),
-          btn("Start a job", "", "go", () => { setSearch(""); setScreen({ s: "tasks", mode: "start" }); }),
+          btn("Clock on & start work", "", "go", () => openStart(true)),
+          btn("Clock on only", "", "", () => send([{ type: "CLOCK_IN" }], { tone: "go", title: `G'day ${first}`, text: `Clocked on at ${at}.` })),
+          btn("Start work", "", "go", () => openStart()),
           btn("Other work", "", "ind", () => setScreen({ s: "codes" })),
           ...brk,
           btn("Back from break", "", "", () => send([{ type: "BREAK_END" }], { tone: "go", title: "Welcome back", text: `Break ended ${at}.` })),
@@ -292,10 +312,10 @@ export function Kiosk({ initialToken }: { initialToken: string | null }) {
       case "finishOff":
         return (
           <div className="stack">
-            <h2 className="k-name">Did you finish {curTask ? `${curTask.code} ${curTask.name}` : "your job"}?</h2>
+            <h2 className="k-name">Did you finish {curLabel}?</h2>
             <div className="k-grid">
-              <button className="k-btn go big" onClick={() => send([{ type: "TASK_FINISH", taskId: curTask?.id }, { type: "CLOCK_OUT" }], { tone: "stop", title: `See you, ${first}`, text: `${curTask?.code ?? "Job"} finished. Clocked off at ${at}.` })}>Yes, finished · clock off<small>{curTask?.name}</small></button>
-              <button className="k-btn" onClick={() => send([{ type: "CLOCK_OUT" }], { tone: "stop", title: `See you, ${first}`, text: `Clocked off at ${at}. ${curTask?.code ?? "The job"} stays open for tomorrow.` })}>Not yet · clock off<small>The job stays open</small></button>
+              <button className="k-btn go big" onClick={() => send([curTask ? { type: "TASK_FINISH", taskId: curTask.id } : { type: "TASK_FINISH", activityTypeId: wstate?.activityTypeId ?? null }, { type: "CLOCK_OUT" }], { tone: "stop", title: `See you, ${first}`, text: `${curTask?.code ?? curAct?.name ?? "Job"} finished. Clocked off at ${at}.` })}>Yes, finished · clock off<small>{curTask?.name ?? curAct?.name}</small></button>
+              <button className="k-btn" onClick={() => send([{ type: "CLOCK_OUT" }], { tone: "stop", title: `See you, ${first}`, text: `Clocked off at ${at}. ${curTask?.code ?? curAct?.name ?? "The job"} stays open for tomorrow.` })}>Not yet · clock off<small>It stays open</small></button>
               <button className="k-btn" onClick={() => setScreen({ s: "menu" })}>Go back</button>
             </div>
           </div>
@@ -332,10 +352,11 @@ export function Kiosk({ initialToken }: { initialToken: string | null }) {
           if (screen.mode === "wait") {
             const c = codeById(screen.codeId);
             send([{ type: "CODE_START", timeCodeId: screen.codeId, taskId: t.id }], { tone: "wait", title: c?.name ?? "Waiting", text: `On ${t.code} from ${at}. Tap your fob when it's sorted.` });
-          } else startTask(t);
+          } else startTask(t, screen.clockOn);
         };
+        const acts = [...(roster?.activities ?? [])].sort((x, y) => Number(!emp?.skills.includes(x.code)) - Number(!emp?.skills.includes(y.code)) || x.name.localeCompare(y.name));
         const tile = (t: Task) => (
-          <button key={t.id} className="k-task" onClick={() => choose(t)} disabled={busy || t.id === curTask?.id && st === "direct"}>
+          <button key={t.id} className="k-task" onClick={() => choose(t)} disabled={busy || (t.id === curTask?.id && st === "direct")}>
             <b>{t.code}{t.priority === 1 ? " · URGENT" : ""}</b>
             <span>{t.name}</span>
             <small>{t.projectName} · {fm(t.std)} standard{t.bay ? ` · ${t.bay}` : ""}{t.onIt ? ` · ${t.onIt} on it` : ""}</small>
@@ -344,15 +365,36 @@ export function Kiosk({ initialToken }: { initialToken: string | null }) {
         return (
           <div className="stack">
             {screen.mode === "wait" && <div className="k-sec">Which job are you waiting on?</div>}
+            {screen.mode === "start" && <h2 className="k-name">{screen.clockOn ? `G'day ${first}. What are you starting?` : "What are you starting?"}</h2>}
             {mine.length > 0 && (<><div className="k-sec">Assigned to you</div><div className="k-grid">{mine.map(tile)}</div></>)}
+            {screen.mode === "start" && acts.length > 0 && (<>
+              <div className="k-sec">General activity · no job needed</div>
+              <div className="k-grid">{acts.map((a) => (
+                <button key={a.id} className="k-task k-act" style={{ borderLeftColor: a.colour }} disabled={busy || (curAct?.id === a.id && st === "direct")}
+                  onClick={() => { resetIdle(); startActivity(a, screen.clockOn); }}>
+                  <b>{a.code}</b><span>{a.name}</span><small>Track time without picking a job</small>
+                </button>))}
+              </div>
+            </>)}
             <div className="k-row"><input className="k-search" placeholder="Search job number or task" value={search} onChange={(e) => { setSearch(e.target.value); resetIdle(); }} aria-label="Search jobs" /></div>
             {suits.length > 0 && (<><div className="k-sec">Suits your trade</div><div className="k-grid">{suits.map(tile)}</div></>)}
             <div className="k-sec">{suits.length ? "Other open jobs" : "All open jobs"}</div>
             <div className="k-grid">{rest.slice(0, 40).map(tile)}</div>
-            <div className="k-row"><button className="k-ghost" onClick={() => setScreen({ s: "menu" })}>Back</button></div>
+            <div className="k-row">
+              {screen.mode === "start" && <button className="k-ghost" onClick={() => setScreen({ s: "codes" })}>Other work (clean-up, toolbox, waiting…)</button>}
+              <button className="k-ghost" onClick={() => setScreen({ s: "menu" })}>Back</button>
+            </div>
           </div>
         );
       }
+      case "day":
+        return (
+          <div className="stack">
+            <h2 className="k-name">{first}&apos;s day</h2>
+            <DayPanel today={today} timeline={timeline} now={appNow} full />
+            <div className="k-row"><button className="k-ghost" onClick={() => setScreen({ s: "menu" })}>Back</button></div>
+          </div>
+        );
       case "menu":
       default:
         return (
@@ -361,10 +403,10 @@ export function Kiosk({ initialToken }: { initialToken: string | null }) {
               <span className="k-ava" style={{ background: emp?.colour }}>{emp?.first[0]}{emp?.last[0]}</span>
               <div>
                 <div className="k-name">{emp?.first} {emp?.last}</div>
-                <div className="k-state"><i className="dot" style={{ background: STATE_TXT[st]?.[1] ?? "#6f7a8c" }} />{STATE_TXT[st]?.[0] ?? "…"}
-                  {curTask ? <> · <b>{curTask.code}</b> {curTask.name}</> : curCode ? <> · {curCode.name}</> : null}
+                <div className="k-state"><i className="dot" style={{ background: STATE_TXT[st]?.[1] ?? "#6f7a8c" }} />{curAct && st === "direct" ? "On an activity" : STATE_TXT[st]?.[0] ?? "…"}
+                  {curTask ? <> · <b>{curTask.code}</b> {curTask.name}</> : curCode ? <> · {curCode.name}</> : curAct ? <> · <b>{curAct.name}</b> (no job)</> : null}
                   {wstate?.since ? <span className="k-meta"> · {fm(inState)}</span> : null}</div>
-                {today ? <div className="k-meta">Today: {fm(Math.round(today.paidS / 60))} paid · {fm(Math.round(today.directS / 60))} on jobs</div> : null}
+              
               </div>
               {camOk && <span className="k-meta" style={{ marginLeft: "auto" }}>Photo taken with each tap</span>}
             </div>
@@ -373,6 +415,7 @@ export function Kiosk({ initialToken }: { initialToken: string | null }) {
               <div className="k-sub">Your next job: <b>{taskById(emp.assigned.find((id) => taskById(id)))?.code}</b> {taskById(emp.assigned.find((id) => taskById(id)))?.name}</div>
             )}
             <div className="k-grid">{menu()}</div>
+            {today && <DayPanel today={today} timeline={timeline} now={appNow} onMore={() => { resetIdle(30_000); setScreen({ s: "day" }); }} />}
             <div className="k-row"><button className="k-ghost" onClick={() => { setScreen({ s: "attract" }); setEmp(null); }}>Not you? Cancel</button></div>
           </div>
         );
@@ -407,6 +450,49 @@ export function Kiosk({ initialToken }: { initialToken: string | null }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+const KIND_TXT: Record<string, [string, string]> = {
+  direct: ["", "#2e9e5e"], indirect: ["", "#3f78cc"], waiting: ["Waiting", "#d08e1c"], break_paid: ["Smoko", "#6c6f7c"], break_unpaid: ["Lunch", "#6c6f7c"],
+  unallocated: ["Not on anything", "#d54141"], pre_shift: ["Before shift", "#4a4a52"], post_shift: ["After shift", "#4a4a52"],
+};
+
+/** "My day": totals, counts and the running sequence of what the worker has done today. */
+function DayPanel({ today, timeline, now, full = false, onMore }: { today: Today | null; timeline: TLItem[]; now: number; full?: boolean; onMore?: () => void }) {
+  if (!today) return <p className="k-sub">Nothing recorded yet today.</p>;
+  const m = (s: number) => fm(Math.round(s / 60));
+  const items = [...timeline].reverse();
+  const shown = full ? items : items.slice(0, 6);
+  const first = timeline[0]?.start ?? 0;
+  const last = timeline.length ? (timeline[timeline.length - 1].end ?? now) : 0;
+  const span = Math.max(1, last - first);
+  return (
+    <div className="k-day">
+      <div className="k-sec">My day {today.firstIn ? `· on since ${tf.format(new Date(today.firstIn))}` : ""}</div>
+      <div className="k-stats">
+        <div><b>{m(today.directS)}</b><span>On jobs &amp; activities</span></div>
+        <div><b>{today.finishedCount}</b><span>Finished</span></div>
+        <div><b>{today.startCount}</b><span>Started</span></div>
+        <div><b>{today.breakCount}</b><span>Breaks · {m(today.breakS)}</span></div>
+        <div><b>{m(today.unallocatedS)}</b><span>Not on anything</span></div>
+        <div><b>{m(today.paidS)}</b><span>Paid so far</span></div>
+      </div>
+      <div className="k-bar-day" aria-hidden="true">
+        {timeline.map((t, i) => <i key={i} style={{ width: `${(((t.end ?? now) - t.start) / span) * 100}%`, background: KIND_TXT[t.kind]?.[1] ?? "#4a4a52" }} />)}
+      </div>
+      <ol className="k-seq">
+        {shown.map((t, i) => (
+          <li key={i}>
+            <span className="k-meta">{tf.format(new Date(t.start))}–{t.end ? tf.format(new Date(t.end)) : "now"}</span>
+            <i className="dot" style={{ background: KIND_TXT[t.kind]?.[1] ?? "#4a4a52" }} />
+            <span>{t.label ?? KIND_TXT[t.kind]?.[0] ?? t.kind}{t.kind === "waiting" && t.label ? "" : ""}{t.finished ? " ✓" : ""}{t.end === null ? " · now" : ""}</span>
+            <span className="k-meta">{fm(Math.round(((t.end ?? now) - t.start) / 60000))}</span>
+          </li>
+        ))}
+      </ol>
+      {!full && items.length > 6 && onMore && <button className="k-ghost" onClick={onMore}>Show my whole day ({items.length} entries)</button>}
     </div>
   );
 }

@@ -59,6 +59,7 @@ Workers don't log in. On the kiosk, the dashed **Demo fobs** panel simulates tap
 1. **Floor board** (log in as Mark). Ethan and Tom are at the top in red, idle for over 15 minutes, and their alerts have fired. Chloe is waiting on parts. Pick **J-24057-01** in the right panel and press **Assign** on Ethan.
 2. **Kiosk.** Tap Ethan's fob. His assigned job is listed first. Start it. Back on the floor board (it refreshes every 5 s), Ethan moves to "On a job".
 3. **Kiosk.** Tap Jack's fob and choose **Waiting on something → Waiting on parts**. Then tap Kate's fob and choose **Smoko**. Watch both move on the floor board.
+3a. **Kiosk: work without an assigned job.** Tap Ryan Murphy's fob (he isn't in yet) and press **Clock on & start work**. Pick a general activity such as **Fitting & assembly** (no job needed). Tap his fob again: the **My day** panel shows breaks taken, things started and finished, and the sequence of his day. Press **Finish & start next** to close that activity and pick a job.
 4. **Timesheets.** Click any day cell to open the worker's day:
    - a colour timeline, with red pins at each idle alert;
    - every tap, with its device and method;

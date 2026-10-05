@@ -58,3 +58,19 @@
 .k-keys button { min-height: 64px; background: var(--k-panel-2); border: 0; border-radius: 10px; font-size: 26px; font-family: var(--f-mono); }
 .k-cam { width: 72px; height: 54px; border-radius: 8px; object-fit: cover; background: #000; border: 1px solid var(--k-line); }
 @media (prefers-reduced-motion: reduce) { .k-tap::before { animation: none; } }
+
+/* General activity tiles and the "My day" panel */
+.k-act { border-left: 6px solid var(--k-tape); }
+.k-act b { color: var(--k-muted); }
+.k-day { background: var(--k-panel); border: 1px solid var(--k-line); border-radius: 12px; padding: 14px 16px; display: grid; gap: 12px; }
+.k-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; }
+.k-stats div { background: var(--k-panel-2); border-radius: 8px; padding: 8px 10px; display: grid; gap: 2px; }
+.k-stats b { font-family: var(--f-mono); font-size: 22px; font-weight: 500; color: var(--k-ink); }
+.k-stats span { font-size: 12.5px; color: var(--k-muted); }
+.k-bar-day { display: flex; height: 12px; border-radius: 4px; overflow: hidden; background: var(--k-panel-2); }
+.k-bar-day i { display: block; height: 100%; min-width: 2px; }
+.k-seq { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.k-seq li { display: grid; grid-template-columns: 120px 14px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px dashed var(--k-line); font-size: 15px; }
+.k-seq li:last-child { border-bottom: 0; }
+.k-seq .dot { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+@media (max-width: 600px) { .k-seq li { grid-template-columns: 96px 12px minmax(0, 1fr); } .k-seq li > :last-child { display: none; } }

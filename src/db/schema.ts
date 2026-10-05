@@ -257,6 +257,7 @@ export const punchEvents = pgTable("punch_events", {
   deviceTime: ts("device_time"),
   workDate: date("work_date").notNull(),
   taskId: uuid("task_id").references(() => tasks.id),
+  activityTypeId: uuid("activity_type_id").references(() => activityTypes.id), // general activity with no job task
   timeCodeId: uuid("time_code_id").references(() => timeCodes.id),
   deviceId: uuid("device_id").references(() => devices.id),
   credentialId: uuid("credential_id"),
@@ -317,6 +318,9 @@ export const attendanceDays = pgTable("attendance_days", {
   stdEarnedS: integer("std_earned_s").notNull().default(0),
   directDoneS: integer("direct_done_s").notNull().default(0),
   lateMin: integer("late_min").notNull().default(0),
+  breakCount: integer("break_count").notNull().default(0),
+  finishedCount: integer("finished_count").notNull().default(0),
+  startCount: integer("start_count").notNull().default(0),
   exceptionCount: integer("exception_count").notNull().default(0),
   flags: text("flags").array().notNull().default([]),
   status: text("status").notNull().default("open"), // open | needs_review | approved | locked

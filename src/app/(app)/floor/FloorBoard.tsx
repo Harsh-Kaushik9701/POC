@@ -179,6 +179,8 @@ function Card({ w, now, idleAlertMin, selTask, canAssign, onAssign, dragOver, se
       <span className="pbar"><i className={over ? "over" : ""} style={{ width: `${Math.min(100, (spentMin / w.task.std) * 100)}%` }} /></span>
       <span className="tm">{fmtMin(inState)} this stint · job total {fmtMin(spentMin)} of {fmtMin(w.task.std)}</span>
     </>);
+  } else if (w.state === "direct" && w.activity) {
+    detail = (<><span><b>{w.activity}</b> · general activity, no job</span><span className="tm">{fmtMin(inState)} this stint</span></>);
   } else if (w.state === "waiting" || w.state === "indirect") {
     detail = (<><span>{w.code?.name ?? "Code"}{w.task ? <> · <b className="mono">{w.task.code}</b></> : null}</span><span className="tm">for {fmtMin(inState)}</span></>);
   } else if (w.state === "break_paid" || w.state === "break_unpaid") {

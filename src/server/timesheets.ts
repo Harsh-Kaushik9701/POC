@@ -13,8 +13,9 @@ export async function weekGrid(monday: string, departmentId?: string | null) {
 }
 
 export async function segmentsFor(employeeId: string, from: string, to: string) {
-  return db.select({ s: t.timeSegments, tk: t.tasks, p: t.projects, c: t.timeCodes })
+  return db.select({ s: t.timeSegments, tk: t.tasks, p: t.projects, c: t.timeCodes, a: t.activityTypes })
     .from(t.timeSegments)
+    .leftJoin(t.activityTypes, eq(t.activityTypes.id, t.timeSegments.activityTypeId))
     .leftJoin(t.tasks, eq(t.tasks.id, t.timeSegments.taskId))
     .leftJoin(t.projects, eq(t.projects.id, t.timeSegments.projectId))
     .leftJoin(t.timeCodes, eq(t.timeCodes.id, t.timeSegments.timeCodeId))
@@ -30,8 +31,9 @@ export async function workerDay(employeeId: string, date: string) {
   if (!emp) return null;
   const [day] = await db.select().from(t.attendanceDays).where(and(eq(t.attendanceDays.employeeId, employeeId), eq(t.attendanceDays.workDate, date)));
   const segs = await segmentsFor(employeeId, date, date);
-  const events = await db.select({ ev: t.punchEvents, tk: t.tasks, c: t.timeCodes, dv: t.devices, u: t.users })
+  const events = await db.select({ ev: t.punchEvents, tk: t.tasks, c: t.timeCodes, dv: t.devices, u: t.users, a: t.activityTypes })
     .from(t.punchEvents)
+    .leftJoin(t.activityTypes, eq(t.activityTypes.id, t.punchEvents.activityTypeId))
     .leftJoin(t.tasks, eq(t.tasks.id, t.punchEvents.taskId))
     .leftJoin(t.timeCodes, eq(t.timeCodes.id, t.punchEvents.timeCodeId))
     .leftJoin(t.devices, eq(t.devices.id, t.punchEvents.deviceId))
@@ -50,7 +52,8 @@ export async function workerDay(employeeId: string, date: string) {
 export async function pickLists() {
   const tasks = await db.select({ id: t.tasks.id, code: t.tasks.code, name: t.tasks.name }).from(t.tasks).orderBy(t.tasks.code);
   const codes = await db.select().from(t.timeCodes).where(eq(t.timeCodes.active, true)).orderBy(t.timeCodes.sort);
-  return { tasks, codes };
+  const activities = await db.select().from(t.activityTypes).orderBy(t.activityTypes.name);
+  return { tasks, codes, activities };
 }
 
 export async function employeesById(ids: string[]) {

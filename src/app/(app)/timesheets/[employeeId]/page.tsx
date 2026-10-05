@@ -31,9 +31,10 @@ export default async function WorkerWeek({ params, searchParams }: { params: Pro
   };
   const byTask = new Map<string, { code: string; name: string; job: string; s: number; cost: number }>();
   const byCode = new Map<string, { name: string; s: number }>();
-  for (const { s, tk, p, c } of segs) {
+  for (const { s, tk, p, c, a } of segs) {
     const sec = ((s.endAt?.getTime() ?? now) - s.startAt.getTime()) / 1000;
-    if (s.kind === "direct" && tk) { const v = byTask.get(tk.id) ?? { code: tk.code, name: tk.name, job: `${p?.code} ${p?.name}`, s: 0, cost: 0 }; v.s += sec; v.cost += (sec / 3600) * (s.costRateCents ?? 0); byTask.set(tk.id, v); }
+    if (s.kind === "direct" && !tk) { const k = `act:${a?.id}`; const v = byTask.get(k) ?? { code: a?.code ?? "–", name: `${a?.name ?? "General work"} (general activity)`, job: "No job", s: 0, cost: 0 }; v.s += sec; v.cost += (sec / 3600) * (s.costRateCents ?? 0); byTask.set(k, v); }
+    else if (s.kind === "direct" && tk) { const v = byTask.get(tk.id) ?? { code: tk.code, name: tk.name, job: `${p?.code} ${p?.name}`, s: 0, cost: 0 }; v.s += sec; v.cost += (sec / 3600) * (s.costRateCents ?? 0); byTask.set(tk.id, v); }
     else if (c && s.kind !== "break_paid" && s.kind !== "break_unpaid") { const v = byCode.get(c.id) ?? { name: c.name, s: 0 }; v.s += sec; byCode.set(c.id, v); }
   }
   const maxAv = Math.max(1, ...days.map((d) => d.availableS));

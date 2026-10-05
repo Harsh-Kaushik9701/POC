@@ -42,6 +42,7 @@ export async function addPunch(formData: FormData) {
   const reason = String(formData.get("reason") ?? "").trim();
   const taskId = String(formData.get("taskId") || "") || null;
   const timeCodeId = String(formData.get("timeCodeId") || "") || null;
+  const activityTypeId = String(formData.get("activityTypeId") || "") || null;
   const back = `/timesheets/${employeeId}/${date}`;
   if (!reason) redirect(`${back}?err=${encodeURIComponent("Add a reason for the change")}`);
   const m = time.match(/^(\d{1,2}):(\d{2})$/);
@@ -50,10 +51,10 @@ export async function addPunch(formData: FormData) {
   if (mins < 4 * 60 && (type === "CLOCK_OUT" || type === "TASK_FINISH")) mins += 24 * 60; // after midnight
   const at = localToUtc(date, mins);
   if (at > appNow()) redirect(`${back}?err=${encodeURIComponent("That time is in the future")}`);
-  if ((type === "TASK_START" || type === "TASK_FINISH") && !taskId) redirect(`${back}?err=${encodeURIComponent("Pick the task")}`);
+  if (type === "TASK_START" && !taskId && !activityTypeId) redirect(`${back}?err=${encodeURIComponent("Pick the task or a general activity")}`);
   if ((type === "CODE_START" || type === "BREAK_START") && !timeCodeId) redirect(`${back}?err=${encodeURIComponent("Pick the code")}`);
   try {
-    const r = await recordPunch({ employeeId, type, at, taskId, timeCodeId, method: "manager", source: "web", actorUserId: u.id, note: reason, correction: { workDate: date } });
+    const r = await recordPunch({ employeeId, type, at, taskId, activityTypeId: taskId ? null : activityTypeId, timeCodeId, method: "manager", source: "web", actorUserId: u.id, note: reason, correction: { workDate: date } });
     await db.insert(t.corrections).values({ employeeId, workDate: date, action: "add_event", eventId: r.id, reason, requestedBy: u.id, approvedBy: u.id });
     await reopenIfApproved(employeeId, date);
     await audit(u.id, "timesheet.add_punch", "punch_event", r.id, { type, time, reason });

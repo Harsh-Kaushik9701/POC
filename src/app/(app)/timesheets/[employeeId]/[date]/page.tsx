@@ -29,7 +29,7 @@ export default async function WorkerDayPage({ params, searchParams }: {
   const data = await workerDay(employeeId, date);
   if (!data) notFound();
   const { emp, day, segs, events, alerts, corrections, approver } = data;
-  const { tasks, codes } = await pickLists();
+  const { tasks, codes, activities } = await pickLists();
   const canCorrect = can(u.role, "timesheets.correct") && day?.status !== "locked";
   const canApprove = can(u.role, "timesheets.approve");
   const showCost = can(u.role, "costs.view");
@@ -40,11 +40,15 @@ export default async function WorkerDayPage({ params, searchParams }: {
   // Time per task and per code
   const byTask = new Map<string, { code: string; name: string; project: string; s: number; cost: number; std: number }>();
   const byCode = new Map<string, { name: string; kind: string; s: number }>();
-  for (const { s, tk, p, c } of segs) {
+  for (const { s, tk, p, c, a } of segs) {
     const sec = ((s.endAt?.getTime() ?? now) - s.startAt.getTime()) / 1000;
     if (s.kind === "direct" && tk) {
       const v = byTask.get(tk.id) ?? { code: tk.code, name: tk.name, project: p?.code ?? "", s: 0, cost: 0, std: tk.standardMinutes };
       v.s += sec; v.cost += (sec / 3600) * (s.costRateCents ?? 0); byTask.set(tk.id, v);
+    } else if (s.kind === "direct") {
+      const key = `act:${a?.id ?? "none"}`;
+      const v = byTask.get(key) ?? { code: a?.code ?? "–", name: `${a?.name ?? "General work"} (general activity)`, project: "No job", s: 0, cost: 0, std: 0 };
+      v.s += sec; v.cost += (sec / 3600) * (s.costRateCents ?? 0); byTask.set(key, v);
     } else if (c) {
       const v = byCode.get(c.id) ?? { name: c.name, kind: s.kind, s: 0 };
       v.s += sec; byCode.set(c.id, v);
@@ -79,6 +83,9 @@ export default async function WorkerDayPage({ params, searchParams }: {
               {approver && day.status === "approved" && <span className="muted small">by {approver.name}{day.approvedAt ? ` · ${fmtTime(day.approvedAt)}` : ""}</span>}
               {day.flags.map((f) => <span key={f} className="chip">{f.replace(/_/g, " ")}</span>)}
               {day.lateMin > 0 && <span className="pill warn">Late {day.lateMin} min</span>}
+              <span className="chip" title="Jobs and activities started">{day.startCount} started</span>
+              <span className="chip" title="Jobs and activities marked finished">{day.finishedCount} finished</span>
+              <span className="chip" title="Smoko and lunch breaks taken">{day.breakCount} break{day.breakCount === 1 ? "" : "s"} · {Math.round((day.breakPaidS + day.breakUnpaidS) / 60)} min</span>
             </div>
             {!day.isOpen && (
               <div className="row">
@@ -97,14 +104,14 @@ export default async function WorkerDayPage({ params, searchParams }: {
           <section className="panel">
             <header><h2>Timeline</h2><span className="muted small">Hover a block for times. Red pins are idle alerts.</span></header>
             <Timeline
-              segs={segs.map(({ s, tk, c }) => ({ kind: s.kind, start: s.startAt.getTime(), end: s.endAt?.getTime() ?? null, label: tk?.code ?? c?.code ?? (s.kind === "unallocated" ? "idle" : null), title: tk ? `${tk.code} ${tk.name}` : c?.name }))}
+              segs={segs.map(({ s, tk, c, a }) => ({ kind: s.kind, start: s.startAt.getTime(), end: s.endAt?.getTime() ?? null, label: tk?.code ?? c?.code ?? (s.kind === "direct" ? a?.code : null) ?? (s.kind === "unallocated" ? "idle" : null), title: tk ? `${tk.code} ${tk.name}` : c?.name ?? (s.kind === "direct" ? `${a?.name ?? "General work"} (no job)` : null) }))}
               shiftStart={day.schedStart?.getTime()} shiftEnd={day.schedEnd?.getTime()} now={isToday ? now : null} pins={pins} />
             <Legend />
           </section>
 
           <div className="grid2">
             <section className="panel">
-              <header><h2>Jobs worked</h2></header>
+              <header><h2>Jobs &amp; activities worked</h2></header>
               <div className="tbl"><table>
                 <thead><tr><th>Task</th><th>Job</th><th className="num">Time</th><th className="num">Standard</th>{showCost && <th className="num">Labour cost</th>}</tr></thead>
                 <tbody>
@@ -145,13 +152,13 @@ export default async function WorkerDayPage({ params, searchParams }: {
         <div className="tbl"><table>
           <thead><tr><th>Time</th><th>What</th><th>Detail</th><th>Where</th><th>How</th><th>Photo</th>{canCorrect && <th />}</tr></thead>
           <tbody>
-            {events.map(({ ev, tk, c, dv, u: actor }) => {
+            {events.map(({ ev, tk, c, dv, u: actor, a }) => {
               const gone = voided.has(ev.id);
               return (
                 <tr key={ev.id} style={gone ? { opacity: 0.5, textDecoration: "line-through" } : undefined}>
                   <td className="num">{fmtTime(ev.occurredAt)}</td>
                   <td>{EVENT_LABEL[ev.type] ?? ev.type}</td>
-                  <td>{c ? <>{c.name}{tk ? " · " : ""}</> : null}{tk ? <><b className="mono">{tk.code}</b> {tk.name}</> : null}{ev.note ? <div className="muted small">{ev.note}</div> : null}</td>
+                  <td>{c ? <>{c.name}{tk ? " · " : ""}</> : null}{tk ? <><b className="mono">{tk.code}</b> {tk.name}</> : a ? <>{a.name} <span className="muted small">(general activity)</span></> : null}{ev.note ? <div className="muted small">{ev.note}</div> : null}</td>
                   <td className="small">{dv?.name ?? (ev.source === "system" ? "System" : ev.source === "web" ? `Web · ${actor?.name ?? ""}` : ev.source)}</td>
                   <td className="small">{ev.method === "nfc" ? "Fob" : ev.method === "pin" ? <span className="pill warn">PIN</span> : ev.method === "manager" ? "Manager" : ev.method}{ev.wasOffline ? <span className="pill info">offline</span> : null}</td>
                   <td>{ev.photoKey ? <a href={`/api/v1/photos/${ev.photoKey}`} target="_blank"><img src={`/api/v1/photos/${ev.photoKey}`} alt={`Photo at ${fmtTime(ev.occurredAt)}`} width={48} height={36} style={{ objectFit: "cover", borderRadius: 4 }} /></a> : <span className="muted small">–</span>}</td>
@@ -178,7 +185,7 @@ export default async function WorkerDayPage({ params, searchParams }: {
             <label className="field">What happened
               <select name="type" defaultValue="CLOCK_OUT">
                 <option value="CLOCK_IN">Clocked on</option><option value="CLOCK_OUT">Clocked off</option>
-                <option value="TASK_START">Started a task</option><option value="TASK_FINISH">Finished a task</option><option value="TASK_PAUSE">Paused a task</option>
+                <option value="TASK_START">Started a task or activity</option><option value="TASK_FINISH">Finished a task or activity</option><option value="TASK_PAUSE">Paused a task</option>
                 <option value="CODE_START">Started a code</option><option value="CODE_END">Ended a code</option>
                 <option value="BREAK_START">Started a break</option><option value="BREAK_END">Back from break</option>
               </select>
@@ -186,6 +193,9 @@ export default async function WorkerDayPage({ params, searchParams }: {
             <label className="field">Time (24 h)<input name="time" placeholder="15:30" required pattern="\d{1,2}:\d{2}" /></label>
             <label className="field">Task (if a task)
               <select name="taskId" defaultValue=""><option value="">–</option>{tasks.map((x) => <option key={x.id} value={x.id}>{x.code} {x.name}</option>)}</select>
+            </label>
+            <label className="field">General activity (if no task)
+              <select name="activityTypeId" defaultValue=""><option value="">–</option>{activities.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select>
             </label>
             <label className="field">Code or break (if a code)
               <select name="timeCodeId" defaultValue=""><option value="">–</option>{codes.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select>

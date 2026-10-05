@@ -24,6 +24,7 @@ export async function GET(req: Request) {
     ))
     .orderBy(t.tasks.priority, t.projects.code, t.tasks.sequence);
   const assigns = await db.select().from(t.taskAssignments).where(ne(t.taskAssignments.status, "released"));
+  const activities = await db.select().from(t.activityTypes).orderBy(t.activityTypes.name);
   const codes = await db.select().from(t.timeCodes).where(eq(t.timeCodes.active, true)).orderBy(t.timeCodes.sort);
   const [policy] = await db.select().from(t.policies).limit(1);
   const [org] = await db.select().from(t.organisation).limit(1);
@@ -45,6 +46,7 @@ export async function GET(req: Request) {
       id: tk.id, code: tk.code, name: tk.name, std: tk.standardMinutes, status: tk.status, priority: tk.priority, bay: tk.bay,
       activity: a?.name ?? null, activityCode: a?.code ?? null, projectCode: p.code, projectName: p.name, onIt: onIt.find((x) => x.task_id === tk.id)?.names ?? null,
     })),
+    activities: activities.map((a) => ({ id: a.id, code: a.code, name: a.name, colour: a.colour })),
     codes: codes.map((c) => ({ id: c.id, code: c.code, name: c.name, category: c.category, isPaid: c.isPaid, requiresTask: c.requiresTask, maxMinutes: c.maxMinutes })),
   });
 }

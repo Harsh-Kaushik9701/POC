@@ -8,6 +8,7 @@ const Event = z.object({
   employeeId: z.string().uuid(),
   type: z.enum(["CLOCK_IN", "CLOCK_OUT", "TASK_START", "TASK_PAUSE", "TASK_FINISH", "CODE_START", "CODE_END", "BREAK_START", "BREAK_END", "VOID"]),
   taskId: z.string().uuid().nullish(),
+  activityTypeId: z.string().uuid().nullish(),
   timeCodeId: z.string().uuid().nullish(),
   supersedesEventId: z.string().uuid().nullish(),
   credentialId: z.string().uuid().nullish(),
@@ -35,7 +36,7 @@ export async function POST(req: Request) {
     const at = e.offline ? Math.min(e.deviceTime + skew, serverNow) : serverNow;
     try {
       const r = await recordPunch({
-        id: e.id, employeeId: e.employeeId, type: e.type, at, deviceTime: e.deviceTime, taskId: e.taskId, timeCodeId: e.timeCodeId,
+        id: e.id, employeeId: e.employeeId, type: e.type, at, deviceTime: e.deviceTime, taskId: e.taskId, activityTypeId: e.activityTypeId, timeCodeId: e.timeCodeId,
         supersedesEventId: e.supersedesEventId, credentialId: e.credentialId, deviceId: device.id, method: e.method,
         source: device.kind === "station" ? "station" : device.kind === "supervisor" ? "supervisor" : "kiosk",
         wasOffline: e.offline, photoKey: e.photoKey, flags: e.photoKey ? [] : ["no_photo"],

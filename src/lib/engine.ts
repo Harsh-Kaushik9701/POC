@@ -27,6 +27,8 @@ export interface EngineEvent {
   type: EventType;
   at: number; // UTC ms
   taskId?: string | null;
+  /** General activity (e.g. Welding) started without a specific job task. */
+  activityTypeId?: string | null;
   timeCodeId?: string | null;
   supersedesEventId?: string | null;
 }
@@ -47,6 +49,7 @@ export interface Segment {
   start: number;
   end: number | null; // null = running now
   taskId: string | null;
+  activityTypeId?: string | null;
   timeCodeId: string | null;
   startEventId: string | null;
   endEventId: string | null;
@@ -90,6 +93,10 @@ export interface DayTotals {
   lateMin: number;
   finishedTaskIds: string[];
   flags: string[];
+  /** Breaks started, things finished (tasks or general activities), and jobs/activities started. */
+  breakCount: number;
+  finishedCount: number;
+  startCount: number;
 }
 
 export interface EngineResult {
@@ -100,7 +107,7 @@ export interface EngineResult {
   ignoredEventIds: string[];
 }
 
-type State = { kind: SegmentKind; taskId: string | null; timeCodeId: string | null; eventId: string };
+type State = { kind: SegmentKind; taskId: string | null; activityTypeId?: string | null; timeCodeId: string | null; eventId: string };
 
 const secs = (ms: number) => Math.round(ms / 1000);
 
@@ -120,12 +127,13 @@ export function runEngine(input: EngineInput): EngineResult {
   let cursor = 0;
   let firstIn: number | null = null;
   let lastOut: number | null = null;
-  let taskBeforeBreak: string | null = null;
+  let beforeBreak: { taskId: string | null; activityTypeId: string | null } | null = null;
+  let breakCount = 0, finishedCount = 0, starts = 0;
   const flags = new Set<string>();
 
   const close = (at: number, endEventId: string | null) => {
     if (st && at > cursor) {
-      raw.push({ kind: st.kind, start: cursor, end: at, taskId: st.taskId, timeCodeId: st.timeCodeId, startEventId: st.eventId, endEventId, flags: [] });
+      raw.push({ kind: st.kind, start: cursor, end: at, taskId: st.taskId, activityTypeId: st.activityTypeId ?? null, timeCodeId: st.timeCodeId, startEventId: st.eventId, endEventId, flags: [] });
     }
   };
 
@@ -153,10 +161,12 @@ export function runEngine(input: EngineInput): EngineResult {
         st = null;
         break;
       case "TASK_START":
-        st = { kind: "direct", taskId: e.taskId ?? null, timeCodeId: null, eventId: e.id };
+        starts++;
+        st = { kind: "direct", taskId: e.taskId ?? null, activityTypeId: e.activityTypeId ?? null, timeCodeId: null, eventId: e.id };
         break;
       case "TASK_FINISH":
         if (e.taskId) finished.push(e.taskId);
+        finishedCount++;
         st = idle();
         break;
       case "TASK_PAUSE": {
@@ -173,15 +183,16 @@ export function runEngine(input: EngineInput): EngineResult {
       }
       case "BREAK_START": {
         const c = e.timeCodeId ? codes[e.timeCodeId] : undefined;
-        { const prev = st as State | null; taskBeforeBreak = prev?.kind === "direct" ? prev.taskId : null; }
+        { const prev = st as State | null; beforeBreak = prev?.kind === "direct" ? { taskId: prev.taskId, activityTypeId: prev.activityTypeId ?? null } : null; }
+        breakCount++;
         st = { kind: c && !c.isPaid ? "break_unpaid" : "break_paid", taskId: null, timeCodeId: e.timeCodeId ?? null, eventId: e.id };
         break;
       }
       case "BREAK_END":
-        st = input.resumeAfterBreak && taskBeforeBreak
-          ? { kind: "direct", taskId: taskBeforeBreak, timeCodeId: null, eventId: e.id }
+        st = input.resumeAfterBreak && beforeBreak
+          ? { kind: "direct", taskId: beforeBreak.taskId, activityTypeId: beforeBreak.activityTypeId, timeCodeId: null, eventId: e.id }
           : idle();
-        taskBeforeBreak = null;
+        beforeBreak = null;
         break;
       case "CODE_END":
         st = idle();
@@ -192,7 +203,7 @@ export function runEngine(input: EngineInput): EngineResult {
 
   const isOpen = st !== null;
   if (st && input.now > cursor) {
-    raw.push({ kind: st.kind, start: cursor, end: null, taskId: st.taskId, timeCodeId: st.timeCodeId, startEventId: st.eventId, endEventId: null, flags: ["running"] });
+    raw.push({ kind: st.kind, start: cursor, end: null, taskId: st.taskId, activityTypeId: st.activityTypeId ?? null, timeCodeId: st.timeCodeId, startEventId: st.eventId, endEventId: null, flags: ["running"] });
   }
 
   // Break overrun -> the excess becomes idle.
@@ -283,6 +294,7 @@ export function runEngine(input: EngineInput): EngineResult {
       overtimeS: Math.max(0, paid - input.ordinaryMin * 60),
       stdEarnedS: stdEarned, directDoneS: directDone, lateMin: late,
       finishedTaskIds: finished, flags: [...flags],
+      breakCount, finishedCount, startCount: starts,
     },
   };
 }

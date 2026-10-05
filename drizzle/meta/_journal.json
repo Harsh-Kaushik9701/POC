@@ -22,6 +22,13 @@
       "when": 1791104997356,
       "tag": "0002_employee_skills",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1791217306004,
+      "tag": "0003_activities_and_counts",
+      "breakpoints": true
     }
   ]
 }

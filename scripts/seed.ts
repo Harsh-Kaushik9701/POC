@@ -243,8 +243,8 @@ async function main() {
     for (const e of order) {
       if (e.apprentice && isoWeekday(day) === 3) continue; // TAFE
       if (sickDays.has(`${e.first}:${day}`)) continue;
-      const evs: { m: number; type: string; task?: string; code?: string }[] = [];
-      const push = (m: number, type: string, x: { task?: string; code?: string } = {}) => { if (m <= endLimit) evs.push({ m, type, ...x }); };
+      const evs: { m: number; type: string; task?: string; code?: string; act?: string }[] = [];
+      const push = (m: number, type: string, x: { task?: string; code?: string; act?: string } = {}) => { if (m <= endLimit) evs.push({ m, type, ...x }); };
       let m = 420 - ri(4, 16) + (R() < 0.08 ? ri(8, 20) : 0);
       push(m, "CLOCK_IN");
       m += Math.round(R() * 6 * e.idle) + 1;
@@ -272,7 +272,10 @@ async function main() {
         cur = available(e, day, cur);
         if (!cur) {
           // Nothing suitable: a useful indirect code, or just standing around.
-          if (R() < 0.55) { const code = pick(["CLEAN", "MAINT", "CLEAN"]); push(m, "CODE_START", { code }); const len = ri(20, 45); m = Math.min(m + len, nextBreak, 925); push(m, "CODE_END"); }
+          // No job to go to: some start a general activity in their trade (no job needed), some do indirect work.
+          const r0 = R();
+          if (r0 < 0.45) { const act = e.skills[0]; push(m, "TASK_START", { act }); m = Math.min(m + ri(30, 80), nextBreak, 925); push(m, "TASK_FINISH", { act }); }
+          else if (r0 < 0.8) { const code = pick(["CLEAN", "MAINT", "CLEAN"]); push(m, "CODE_START", { code }); const len = ri(20, 45); m = Math.min(m + len, nextBreak, 925); push(m, "CODE_END"); }
           m += ri(8, 25);
           continue;
         }
@@ -310,7 +313,7 @@ async function main() {
         const at = localToUtc(day, x.m) + ri(0, 50) * 1000;
         events.push({
           id: uuidv7(at), employeeId: e.id, type: x.type, occurredAt: new Date(at), receivedAt: new Date(at + 400), workDate: day,
-          taskId: x.task ?? null, timeCodeId: x.code ? C[x.code] : null, deviceId: kiosk.id, method: R() < 0.03 ? "pin" : "nfc", source: "kiosk",
+          taskId: x.task ?? null, activityTypeId: x.act ? A[x.act] : null, timeCodeId: x.code ? C[x.code] : null, deviceId: kiosk.id, method: R() < 0.03 ? "pin" : "nfc", source: "kiosk",
           flags: [],
         });
       }
@@ -319,18 +322,18 @@ async function main() {
 
   // Shape "today" so the floor board tells a story at the demo time.
   if (isWorkday && NOW_MIN > 470) {
-    const tail = (first: string, minsAgo: number, type: string, code?: string) => {
+    const tail = (first: string, minsAgo: number, type: string, code?: string, act?: string) => {
       const e = emps.find((x) => x.first === first)!;
       const at = NOW - minsAgo * 60_000;
       // drop that worker's events after the cut, then add the tail event
       for (let i = events.length - 1; i >= 0; i--) if (events[i].employeeId === e.id && events[i].workDate === TODAY && events[i].occurredAt.getTime() >= at) events.splice(i, 1);
       const lastTask = [...events].reverse().find((x) => x.employeeId === e.id && x.workDate === TODAY && x.type === "TASK_START")?.taskId ?? null;
       events.push({ id: uuidv7(at), employeeId: e.id, type, occurredAt: new Date(at), receivedAt: new Date(at), workDate: TODAY,
-        taskId: type === "TASK_PAUSE" ? lastTask : null, timeCodeId: code ? C[code] : null, deviceId: kiosk.id, method: "nfc", source: "kiosk", flags: [] });
+        taskId: type === "TASK_PAUSE" ? lastTask : null, activityTypeId: act ? A[act] : null, timeCodeId: code ? C[code] : null, deviceId: kiosk.id, method: "nfc", source: "kiosk", flags: [] });
     };
     tail("Ethan", 24, "TASK_PAUSE");          // idle, alert already fired
     tail("Tom", 19, "TASK_PAUSE");            // idle
-    tail("Kate", 7, "TASK_PAUSE");            // just went idle
+    tail("Kate", 7, "TASK_START", undefined, "PAINT"); // no job free: started a general activity herself
     tail("Chloe", 31, "TASK_PAUSE", "WAIT-PARTS"); // blocked on parts
     tail("Daniel", 12, "CODE_START", "MAINT");
   }

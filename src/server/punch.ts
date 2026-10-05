@@ -13,6 +13,8 @@ export interface PunchInput {
   at?: number; // UTC ms; defaults to now
   deviceTime?: number;
   taskId?: string | null;
+  /** General activity (e.g. Welding) when the worker isn't on a specific job task. */
+  activityTypeId?: string | null;
   timeCodeId?: string | null;
   deviceId?: string | null;
   credentialId?: string | null;
@@ -48,6 +50,7 @@ export interface WorkerState {
   kind: "off" | "pre_shift" | "post_shift" | "unallocated" | "direct" | "indirect" | "waiting" | "break_paid" | "break_unpaid";
   since: number | null;
   taskId: string | null;
+  activityTypeId: string | null;
   timeCodeId: string | null;
   workDate: string | null;
 }
@@ -55,8 +58,8 @@ export interface WorkerState {
 export async function getWorkerState(employeeId: string): Promise<WorkerState> {
   const [seg] = await db.select().from(t.timeSegments)
     .where(and(eq(t.timeSegments.employeeId, employeeId), isNull(t.timeSegments.endAt))).limit(1);
-  if (!seg) return { kind: "off", since: null, taskId: null, timeCodeId: null, workDate: null };
-  return { kind: seg.kind as WorkerState["kind"], since: seg.startAt.getTime(), taskId: seg.taskId, timeCodeId: seg.timeCodeId, workDate: seg.workDate };
+  if (!seg) return { kind: "off", since: null, taskId: null, activityTypeId: null, timeCodeId: null, workDate: null };
+  return { kind: seg.kind as WorkerState["kind"], since: seg.startAt.getTime(), taskId: seg.taskId, activityTypeId: seg.taskId ? null : seg.activityTypeId, timeCodeId: seg.timeCodeId, workDate: seg.workDate };
 }
 
 /**
@@ -72,11 +75,15 @@ export async function recordPunch(p: PunchInput) {
   const at = p.at ?? appNow();
   if (p.type === "CLOCK_IN" && !p.correction) await autoClockOffStale(p.employeeId, at);
 
-  const state = p.correction ? { kind: "direct" as const, since: null, taskId: p.taskId ?? null, timeCodeId: null, workDate: p.correction.workDate } : await getWorkerState(p.employeeId);
+  const state = p.correction ? { kind: "direct" as const, since: null, taskId: p.taskId ?? null, activityTypeId: p.activityTypeId ?? null, timeCodeId: null, workDate: p.correction.workDate } : await getWorkerState(p.employeeId);
   const on = p.correction ? p.type !== "CLOCK_IN" : state.kind !== "off";
   if (p.type === "CLOCK_IN" && on) throw new PunchError("Already clocked on");
   if (p.type !== "CLOCK_IN" && p.type !== "VOID" && !on) throw new PunchError("Not clocked on yet. Clock on first.");
-  if ((p.type === "TASK_START") && !p.taskId) throw new PunchError("Choose a job task");
+  if (p.type === "TASK_START" && !p.taskId && !p.activityTypeId) throw new PunchError("Choose a job or an activity");
+  if (p.type === "TASK_START" && !p.taskId && p.activityTypeId) {
+    const [act] = await db.select().from(t.activityTypes).where(eq(t.activityTypes.id, p.activityTypeId));
+    if (!act) throw new PunchError("Unknown activity");
+  }
   if (p.type === "TASK_START" && p.taskId) {
     const [task] = await db.select().from(t.tasks).where(eq(t.tasks.id, p.taskId));
     if (!task) throw new PunchError("Unknown task");
@@ -106,10 +113,12 @@ export async function recordPunch(p: PunchInput) {
     ? (await db.select({ w: t.punchEvents.workDate }).from(t.punchEvents).where(eq(t.punchEvents.id, p.supersedesEventId)))[0]?.w ?? localDate(at)
     : on && state.workDate ? state.workDate : await workDateFor(p.employeeId, p.type, at);
   const taskId = p.type === "TASK_FINISH" || p.type === "TASK_PAUSE" ? (p.taskId ?? state.taskId) : p.taskId ?? null;
+  const activityTypeId = p.type === "TASK_START" ? (p.taskId ? null : p.activityTypeId ?? null)
+    : (p.type === "TASK_FINISH" || p.type === "TASK_PAUSE") && !taskId ? (p.activityTypeId ?? state.activityTypeId) : null;
 
   await db.insert(t.punchEvents).values({
     id, employeeId: p.employeeId, type: p.type, occurredAt: new Date(at), receivedAt: new Date(appNow()), deviceTime: p.deviceTime ? new Date(p.deviceTime) : null,
-    workDate, taskId, timeCodeId: p.timeCodeId ?? null, deviceId: p.deviceId ?? null, credentialId: p.credentialId ?? null,
+    workDate, taskId, activityTypeId, timeCodeId: p.timeCodeId ?? null, deviceId: p.deviceId ?? null, credentialId: p.credentialId ?? null,
     method: p.method, source: p.source, actorUserId: p.actorUserId ?? null, supersedesEventId: p.supersedesEventId ?? null,
     wasOffline: p.wasOffline ?? false, photoKey: p.photoKey ?? null, note: p.note ?? null, flags: p.flags ?? [],
   }).onConflictDoNothing();

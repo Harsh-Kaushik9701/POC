@@ -54,7 +54,7 @@ export async function recomputeDay(employeeId: string, workDate: string, opts: {
     const shift = shiftFor(pattern, workDate);
     const events: EngineEvent[] = evRows.map((e) => ({
       id: e.id, type: e.type as EventType, at: e.occurredAt.getTime(),
-      taskId: e.taskId, timeCodeId: e.timeCodeId, supersedesEventId: e.supersedesEventId,
+      taskId: e.taskId, activityTypeId: e.activityTypeId, timeCodeId: e.timeCodeId, supersedesEventId: e.supersedesEventId,
     }));
     const r = runEngine({
       events, codes, shiftStart: shift.start, shiftEnd: shift.end,
@@ -70,7 +70,7 @@ export async function recomputeDay(employeeId: string, workDate: string, opts: {
         return {
           id: uuidv7(g.start), employeeId, workDate, kind: g.kind,
           startAt: new Date(g.start), endAt: g.end === null ? null : new Date(g.end),
-          taskId: g.taskId, projectId: task?.projectId ?? null, activityTypeId: task?.activityTypeId ?? null,
+          taskId: g.taskId, projectId: task?.projectId ?? null, activityTypeId: task?.activityTypeId ?? g.activityTypeId ?? null,
           timeCodeId: g.timeCodeId, startEventId: g.startEventId, endEventId: g.endEventId,
           costRateCents: g.kind === "direct" || g.kind === "waiting" ? emp.costRateCents : null, flags: g.flags,
         };
@@ -101,7 +101,7 @@ export async function recomputeDay(employeeId: string, workDate: string, opts: {
       attendanceS: tot.attendanceS, prePostS: tot.prePostS, breakPaidS: tot.breakPaidS, breakUnpaidS: tot.breakUnpaidS,
       reducedS: tot.reducedS, paidS: tot.paidS, availableS: tot.availableS, directS: tot.directS, indirectS: tot.indirectS,
       waitingS: tot.waitingS, unallocatedS: tot.unallocatedS, overtimeS: tot.overtimeS, stdEarnedS: tot.stdEarnedS,
-      directDoneS: tot.directDoneS, lateMin: tot.lateMin, exceptionCount: count, flags: tot.flags, status, updatedAt: new Date(),
+      directDoneS: tot.directDoneS, lateMin: tot.lateMin, breakCount: tot.breakCount, finishedCount: tot.finishedCount, startCount: tot.startCount, exceptionCount: count, flags: tot.flags, status, updatedAt: new Date(),
     };
     if (tot.firstIn === null) {
       if (existing) await tx.delete(t.attendanceDays).where(eq(t.attendanceDays.id, existing.id));

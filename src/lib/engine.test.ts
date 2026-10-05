@@ -189,4 +189,20 @@ describe("rules", () => {
     expect(min(r.totals.breakUnpaidS)).toBe(30);
     expect(r.ignoredEventIds.length).toBe(1);
   });
+
+  it("tracks a general activity with no job, and counts starts, finishes and breaks", () => {
+    const r = runEngine({ ...base, events: [
+      ev("07:00", "CLOCK_IN"), ev("07:00", "TASK_START", { activityTypeId: "WELDING" }),
+      ev("08:00", "TASK_FINISH", { activityTypeId: "WELDING" }), ev("08:00", "TASK_START", { taskId: "J-101" }),
+      ev("09:00", "BREAK_START", { timeCodeId: "SMOKO" }), ev("09:10", "BREAK_END"),
+      ev("09:10", "TASK_START", { activityTypeId: "PAINT" }), ev("10:00", "BREAK_START", { timeCodeId: "SMOKO" }), ev("10:10", "BREAK_END"), ev("10:30", "CLOCK_OUT"),
+    ] });
+    const direct = r.segments.filter((g) => g.kind === "direct");
+    expect(direct.map((g) => g.activityTypeId ?? g.taskId)).toEqual(["WELDING", "J-101", "PAINT"]);
+    expect(min(r.totals.directS)).toBe(170);
+    expect(r.totals.startCount).toBe(3);
+    expect(r.totals.finishedCount).toBe(1);
+    expect(r.totals.breakCount).toBe(2);
+    expect(min(r.totals.unallocatedS)).toBe(20);
+  });
 });

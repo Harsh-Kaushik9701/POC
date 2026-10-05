@@ -10,6 +10,8 @@ export interface FloorWorker {
   state: FloorState; since: number | null;
   task: { id: string; code: string; name: string; projectCode: string; std: number; spentS: number } | null;
   code: { code: string; name: string } | null;
+  /** General activity (no job), e.g. "Welding". */
+  activity: string | null;
   today: { directS: number; availableS: number; unallocatedS: number; paidS: number } | null;
   firstIn: number | null; lastOut: number | null; late: boolean;
   next: { id: string; code: string; name: string }[];
@@ -33,6 +35,7 @@ export async function getFloor() {
   const days = await db.select().from(t.attendanceDays).where(eq(t.attendanceDays.workDate, today));
   const open = await db.select().from(t.timeSegments).where(isNull(t.timeSegments.endAt));
   const codes = await db.select().from(t.timeCodes);
+  const acts = await db.select().from(t.activityTypes);
   const taskIds = open.map((s) => s.taskId).filter(Boolean) as string[];
   const curTasks = taskIds.length
     ? await db.select({ tk: t.tasks, p: t.projects }).from(t.tasks).innerJoin(t.projects, eq(t.projects.id, t.tasks.projectId)).where(inArray(t.tasks.id, taskIds))
@@ -59,6 +62,7 @@ export async function getFloor() {
       state, since: seg ? seg.startAt.getTime() : null,
       task: ct ? { id: ct.tk.id, code: ct.tk.code, name: ct.tk.name, projectCode: ct.p.code, std: ct.tk.standardMinutes, spentS: spent.get(ct.tk.id) ?? 0 } : null,
       code: code ? { code: code.code, name: code.name } : null,
+      activity: seg && seg.kind === "direct" && !seg.taskId ? acts.find((a) => a.id === seg.activityTypeId)?.name ?? "General work" : null,
       today: day ? { directS: day.directS, availableS: day.availableS, unallocatedS: day.unallocatedS, paidS: day.paidS } : null,
       firstIn: day?.firstIn?.getTime() ?? null, lastOut: day?.lastOut?.getTime() ?? null, late,
       next: assigned.filter((x) => x.a.employeeId === e.id).map((x) => ({ id: x.tk.id, code: x.tk.code, name: x.tk.name })),
