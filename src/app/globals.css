@@ -1,25 +1,28 @@
-/* Ironbark Shop Floor — design tokens and components.
-   Industrial workshop look: cool steel neutrals, hi-vis yellow as the one accent,
-   state colours carry meaning (green on a job, red idle, amber waiting, blue indirect, grey break). */
+/* Akaal Management — design tokens and components.
+   Brand: black and gold, industrial and heavy-duty, to sit alongside Akaal Semi-Trailers.
+   Brand colours live in --brand / --nav*; swap them here to match the official palette.
+   State colours carry meaning and stay fixed (green on a job, red idle, amber waiting, blue indirect, grey break). */
 :root {
-  --bg: #eef1f4; --surface: #ffffff; --surface-2: #e4e9ee; --surface-3: #d7dee5;
-  --ink: #16202a; --muted: #55626f; --line: #d0d8e0; --link: #235b8e;
-  --tape: #f2c430; --tape-ink: #1b1a10;
-  --nav: #17202a; --nav-ink: #dfe6ed; --nav-muted: #8d9aa8; --nav-active: #253240;
-  --s-direct: #2e8752; --s-indirect: #3a6ebd; --s-waiting: #c47f10; --s-break: #8a92a2; --s-unalloc: #cf3737; --s-off: #c5cdd6;
+  --brand: #c9a227; --brand-ink: #14130f; --brand-deep: #8a6d12;
+  --bg: #f2f1ee; --surface: #ffffff; --surface-2: #e9e7e2; --surface-3: #dcd9d2;
+  --ink: #17171a; --muted: #5d5c63; --line: #d9d6cf; --link: #1f4f86;
+  --tape: var(--brand); --tape-ink: var(--brand-ink);
+  --nav: #111114; --nav-ink: #ebe9e4; --nav-muted: #8f8d87; --nav-active: #23232a;
+  --s-direct: #2e8752; --s-indirect: #3a6ebd; --s-waiting: #c47f10; --s-break: #8a8f9c; --s-unalloc: #cf3737; --s-off: #cfccc5;
   --good-bg: #e3f2e9; --bad-bg: #fbe6e6; --warn-bg: #fbf0dc; --info-bg: #e5eefa;
   --f-display: "Barlow Condensed", "Arial Narrow", Arial, sans-serif;
   --f-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   --f-mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
-  --r: 8px;
+  --r: 6px;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #11161c; --surface: #19212a; --surface-2: #212b35; --surface-3: #2a3540;
-    --ink: #e4eaf0; --muted: #94a2b0; --line: #2d3946; --link: #8dbbe8;
-    --nav: #0c1116; --nav-active: #1d2731;
-    --s-direct: #3fae6c; --s-indirect: #5b8fdb; --s-waiting: #d8982c; --s-break: #7c8597; --s-unalloc: #e25555; --s-off: #3a4654;
+    --brand: #d4af37; --brand-ink: #14130f;
+    --bg: #0f0f12; --surface: #18181c; --surface-2: #212126; --surface-3: #2a2a30;
+    --ink: #ecebe7; --muted: #a09e98; --line: #2e2e35; --link: #8dbbe8;
+    --nav: #09090b; --nav-active: #1c1c21;
+    --s-direct: #3fae6c; --s-indirect: #5b8fdb; --s-waiting: #d8982c; --s-break: #7c8190; --s-unalloc: #e25555; --s-off: #3a3a42;
     --good-bg: #16302a; --bad-bg: #3a1c1f; --warn-bg: #362912; --info-bg: #182a40;
     color-scheme: dark;
   }
@@ -32,7 +35,7 @@ a:hover { text-decoration: underline; }
 button, input, select, textarea { font: inherit; color: inherit; }
 :focus-visible { outline: 2px solid var(--link); outline-offset: 2px; }
 h1, h2, h3 { font-family: var(--f-display); line-height: 1.1; margin: 0; text-wrap: balance; }
-h1 { font-size: 32px; font-weight: 700; letter-spacing: .2px; }
+h1 { font-size: 32px; font-weight: 700; letter-spacing: .3px; text-transform: uppercase; }
 h2 { font-size: 22px; font-weight: 600; }
 h3 { font-size: 17px; font-weight: 600; }
 p { margin: 0; }
@@ -46,7 +49,10 @@ p { margin: 0; }
 .nav { background: var(--nav); color: var(--nav-ink); padding: 16px 10px; display: flex; flex-direction: column; gap: 4px; position: sticky; top: 0; height: 100vh; overflow: auto; }
 .brand { padding: 4px 10px 16px; display: grid; gap: 2px; }
 .brand b { font-family: var(--f-display); font-size: 22px; letter-spacing: .3px; }
-.brand b i { font-style: normal; background: var(--tape); color: var(--tape-ink); padding: 0 5px; border-radius: 3px; margin-right: 6px; }
+.brand b i { font-style: normal; background: var(--brand); color: var(--brand-ink); padding: 0 6px; border-radius: 2px; margin-right: 8px; letter-spacing: .5px; }
+.brand b { text-transform: uppercase; letter-spacing: .8px; font-size: 22px; display: flex; align-items: baseline; flex-wrap: wrap; }
+.brand b small { font-size: 13px; font-weight: 600; letter-spacing: 2px; color: var(--brand); margin-left: 6px; }
+.nav { border-right: 3px solid var(--brand); }
 .brand span { font-size: 12px; color: var(--nav-muted); }
 .nav a { color: var(--nav-ink); padding: 8px 10px; border-radius: 6px; display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 14px; }
 .nav a:hover { background: var(--nav-active); text-decoration: none; }
@@ -79,7 +85,7 @@ p { margin: 0; }
 .tbl { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); }
 table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
 th, td { text-align: left; padding: 8px 11px; border-bottom: 1px solid var(--line); vertical-align: middle; }
-th { font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 500; background: var(--surface-2); white-space: nowrap; }
+th { font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 500; background: var(--surface-2); white-space: nowrap; border-bottom: 2px solid var(--brand); }
 tbody tr:last-child td { border-bottom: 0; }
 tbody tr:hover td { background: color-mix(in srgb, var(--surface-2) 45%, transparent); }
 td.num, th.num { text-align: right; font-family: var(--f-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -87,6 +93,7 @@ tfoot td { font-weight: 600; background: var(--surface-2); }
 .btn { display: inline-flex; align-items: center; gap: 6px; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 6px 12px; font-size: 13.5px; font-weight: 500; cursor: pointer; color: var(--ink); white-space: nowrap; }
 .btn:hover { border-color: var(--muted); text-decoration: none; }
 .btn.primary { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.btn.primary:hover { background: var(--brand); color: var(--brand-ink); border-color: var(--brand); }
 .btn.tape { background: var(--tape); color: var(--tape-ink); border-color: var(--tape); }
 .btn.danger { color: var(--s-unalloc); border-color: var(--s-unalloc); }
 .btn.sm { padding: 3px 8px; font-size: 12.5px; }
@@ -185,6 +192,17 @@ label.field > input, label.field > select, label.field > textarea { color: var(-
 .heat .hc { height: 26px; border-radius: 2px; font-family: var(--f-mono); font-size: 10px; display: grid; place-items: center; }
 
 /* Login */
+.login-split { min-height: 100vh; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 560px); }
+.login-hero { background: var(--nav); color: var(--nav-ink); padding: 48px; display: grid; align-content: space-between; gap: 24px; border-right: 4px solid var(--brand); }
+.login-hero .mark { font-family: var(--f-display); font-size: 22px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+.login-hero .mark i { font-style: normal; background: var(--brand); color: var(--brand-ink); padding: 0 7px; margin-right: 10px; border-radius: 2px; }
+.login-hero h2 { font-family: var(--f-display); font-size: clamp(40px, 6vw, 72px); font-weight: 700; text-transform: uppercase; line-height: .95; letter-spacing: .5px; }
+.login-hero h2 em { font-style: normal; color: var(--brand); }
+.login-hero p { color: var(--nav-muted); max-width: 46ch; }
+.login-hero .facts { display: flex; gap: 28px; flex-wrap: wrap; font-family: var(--f-mono); font-size: 12px; color: var(--nav-muted); text-transform: uppercase; letter-spacing: .08em; }
+.login-hero .facts b { display: block; color: var(--brand); font-family: var(--f-display); font-size: 26px; letter-spacing: 0; }
+.login-split .login { min-height: auto; }
+@media (max-width: 900px) { .login-split { grid-template-columns: minmax(0, 1fr); } .login-hero { padding: 28px 20px; border-right: 0; border-bottom: 4px solid var(--brand); } }
 .login { min-height: 100vh; display: grid; place-items: center; padding: 24px; }
 .login .card { width: min(560px, 100%); display: grid; gap: 16px; }
 .login .who { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; text-align: left; width: 100%; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; cursor: pointer; }

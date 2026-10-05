@@ -7,6 +7,7 @@ import { appNow, addDays, todayLocal } from "@/lib/time";
 import { ROLE_LABEL } from "@/lib/format";
 import { NavLinks, type NavItem } from "@/components/NavLinks";
 import { DemoClock } from "@/components/DemoClock";
+import { BRAND } from "@/lib/brand";
 
 async function logout() {
   "use server";
@@ -43,7 +44,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <div className="shell">
       <nav className="nav" aria-label="Main">
-        <div className="brand"><b><i>IB</i>Shop Floor</b><span>Ironbark Trailers · Wacol</span></div>
+        <div className="brand"><b><i>{BRAND.shortMark}</i>{BRAND.wordmark}<small>{BRAND.product}</small></b><span>{BRAND.company} · {BRAND.siteLabel}</span></div>
         <NavLinks items={items} />
         <div className="foot">
           <span className="mono"><DemoClock serverNow={appNow()} demo={!!process.env.DEMO_NOW} /></span>

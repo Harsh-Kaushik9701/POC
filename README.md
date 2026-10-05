@@ -1,8 +1,8 @@
-# Ironbark Shop Floor — proof of concept
+# Akaal Management — proof of concept
 
 A working starter codebase for workshop time tracking, modelled on TimeDock but built to answer the question TimeDock can't: **of the time between clock-on and clock-off, how much was spent on jobs and how much was idle?**
 
-It ships with demo data for a made-up fabrication workshop in Brisbane: *Ironbark Trailers & Truck Bodies, Wacol QLD*. There are 12 staff, 13 jobs, and two weeks of history plus "today" running live.
+It is branded for **Akaal Semi-Trailers** (Rocklea QLD) and ships with demo data: the people, clients, jobs and times are all made up. There are 12 staff, 13 jobs, and two weeks of history plus "today" running live.
 
 Everything here is real code running on a real database. The kiosk, the floor board, timesheets, jobsheets, approvals, corrections, exports and setup all read and write PostgreSQL. Only the people, jobs and times are invented.
 

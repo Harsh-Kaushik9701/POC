@@ -382,7 +382,7 @@ export function Kiosk({ initialToken }: { initialToken: string | null }) {
   return (
     <div className="kiosk">
       <header className="k-bar">
-        <b><i>IB</i>{roster?.org.name ?? "Shop Floor"}</b>
+        <b><i>AK</i>{roster?.org.name ?? "Akaal Management"}</b>
         <div className="k-row">
           <video ref={videoRef} className="k-cam" muted playsInline hidden={!camOk} aria-label="Camera preview" />
           {outbox.length > 0 && <span className="k-net off">{outbox.length} tap{outbox.length > 1 ? "s" : ""} waiting to send</span>}
@@ -436,7 +436,7 @@ function PinPad({ pin, setPin, err, onCancel, onSubmit }: {
 function Pair({ onPair }: { onPair: (t: string) => void }) {
   const [v, setV] = useState("");
   return (
-    <div className="kiosk"><header className="k-bar"><b><i>IB</i>Pair this tablet</b></header>
+    <div className="kiosk"><header className="k-bar"><b><i>AK</i>Pair this tablet</b></header>
       <section className="k-body">
         <div className="k-pin">
           <p className="k-sub">Enter the device code shown in Setup → Devices.</p>

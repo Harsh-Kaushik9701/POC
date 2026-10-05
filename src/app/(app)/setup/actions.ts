@@ -1,5 +1,6 @@
 "use server";
-import { randomBytes, createHash } from "node:crypto";
+import { randomBytes } from "node:crypto";
+import { pinHash } from "@/lib/pin";
 import { and, eq, isNull } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect, unstable_rethrow } from "next/navigation";
@@ -151,7 +152,7 @@ export async function setPin(f: FormData) {
   const u = await requireUser("setup.people");
   const employeeId = s(f, "employeeId"), pin = s(f, "pin");
   if (!/^\d{4,6}$/.test(pin)) back(`/setup/staff/${employeeId}`, "PIN must be 4 to 6 digits", true);
-  await db.update(t.employees).set({ pinHash: createHash("sha256").update(`ironbark:${pin}`).digest("hex") }).where(eq(t.employees.id, employeeId));
+  await db.update(t.employees).set({ pinHash: pinHash(pin) }).where(eq(t.employees.id, employeeId));
   await audit(u.id, "employee.set_pin", "employee", employeeId);
   back(`/setup/staff/${employeeId}`, "PIN updated");
 }

@@ -1,8 +1,8 @@
 {
-  "name": "ironbark-shopfloor-poc",
+  "name": "akaal-management",
   "version": "0.1.0",
   "private": true,
-  "description": "Proof of concept: workshop time tracking with active vs idle time (TimeDock-style) for an Australian fabrication shop",
+  "description": "Akaal Management: workshop time tracking with active vs idle time (TimeDock-style) for an Australian fabrication shop",
   "scripts": {
     "dev": "next dev -p 3000",
     "build": "next build",

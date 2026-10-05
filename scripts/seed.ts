@@ -1,12 +1,12 @@
 /**
- * Seeds a realistic demo: Ironbark Trailers & Truck Bodies, a fabrication workshop in Wacol, Brisbane.
- * All names, jobs and figures are made up.
+ * Seeds a realistic demo for Akaal Semi-Trailers, a trailer manufacturer in Rocklea, Brisbane.
+ * The company name and address are Akaal's; every person, client, job and figure is made-up demo data.
  *
  * It generates ~10 working days of history plus "today" up to the demo clock (DEMO_NOW in .env),
  * by writing punch events exactly as kiosks would, then running the same engine the app uses.
  */
 import "dotenv/config";
-import { createHash } from "node:crypto";
+import { pinHash } from "../src/lib/pin";
 import { sql as dsql } from "drizzle-orm";
 import { db, sqlClient, t } from "../src/db";
 import { appNow, localDate, localMinutes, localToUtc, isoWeekday, addDays, mondayOf } from "../src/lib/time";
@@ -21,7 +21,6 @@ function rng(seed: number) {
 const R = rng(20261006);
 const ri = (a: number, b: number) => a + Math.floor(R() * (b - a + 1));
 const pick = <T,>(xs: T[]) => xs[Math.floor(R() * xs.length)];
-export const pinHash = (pin: string) => createHash("sha256").update(`ironbark:${pin}`).digest("hex");
 
 async function main() {
   const existing = await db.select().from(t.organisation).limit(1);
@@ -38,10 +37,10 @@ async function main() {
 
   /* ---------- Organisation, site, rules ---------- */
   await db.insert(t.organisation).values({
-    name: "Ironbark Trailers & Truck Bodies Pty Ltd", tradingName: "Ironbark Trailers", abn: "51 824 753 556",
-    address: "14 Boundary Road, Wacol QLD 4076", timezone: "Australia/Brisbane", currency: "AUD",
+    name: "Akaal Semi-Trailers", tradingName: "Akaal Semi-Trailers", abn: null,
+    address: "45 Suscatand Street, Rocklea QLD 4106", timezone: "Australia/Brisbane", currency: "AUD",
   });
-  const [site] = await db.insert(t.sites).values({ name: "Wacol Workshop", code: "WAC", address: "14 Boundary Road, Wacol QLD 4076", lat: "-27.5866", lng: "152.9286", geofenceRadiusM: 150 }).returning();
+  const [site] = await db.insert(t.sites).values({ name: "Rocklea Workshop", code: "ROC", address: "45 Suscatand Street, Rocklea QLD 4106", lat: "-27.5440", lng: "153.0060", geofenceRadiusM: 150 }).returning();
   const deptNames = ["Fabrication", "Paint & Finish", "Fit-out & Electrical", "Yard"];
   const depts = Object.fromEntries((await db.insert(t.departments).values(deptNames.map((name) => ({ siteId: site.id, name }))).returning()).map((d) => [d.name, d.id]));
   const [dayShift, appShift] = await db.insert(t.workPatterns).values([
@@ -69,18 +68,18 @@ async function main() {
   const actRows = await db.insert(t.activityTypes).values([
     { code: "FAB", name: "Fabrication", colour: "#2e8752" }, { code: "WELD", name: "Welding", colour: "#c47f10" },
     { code: "PAINT", name: "Blasting & painting", colour: "#3a6ebd" }, { code: "FIT", name: "Fitting & assembly", colour: "#7a5cc2" },
-    { code: "HYD", name: "Hydraulics", colour: "#0f8a8a" }, { code: "ELEC", name: "Auto electrical", colour: "#b8452e" },
+    { code: "HYD", name: "Air, brakes & hydraulics", colour: "#0f8a8a" }, { code: "ELEC", name: "Auto electrical", colour: "#b8452e" },
     { code: "QC", name: "Inspection & QA", colour: "#5b6b7c" },
   ]).returning();
   const A = Object.fromEntries(actRows.map((a) => [a.code, a.id]));
 
   /* ---------- Clients and jobs ---------- */
   const clientRows = await db.insert(t.clients).values([
-    { name: "Brisbane City Haulage", abn: "33 102 417 032", contactName: "Craig Donnelly", phone: "07 3277 4410", email: "craig@bchaulage.example.com.au", suburb: "Rocklea QLD" },
-    { name: "Darling Downs Grain Co", abn: "71 615 330 905", contactName: "Bec Hartley", phone: "07 4632 8812", email: "fleet@ddgrain.example.com.au", suburb: "Toowoomba QLD" },
-    { name: "Lockyer Valley Earthmoving", abn: "46 090 112 784", contactName: "Shane Pirie", phone: "0428 551 902", email: "shane@lvearthmoving.example.com.au", suburb: "Gatton QLD" },
-    { name: "Sunshine Coast Tippers", abn: "88 143 507 221", contactName: "Narelle Brooks", phone: "07 5491 3307", email: "admin@sctippers.example.com.au", suburb: "Caloundra QLD" },
-    { name: "Scenic Rim Livestock Transport", abn: "19 627 448 310", contactName: "Matt Cuthbert", phone: "0409 117 664", email: "matt@srlt.example.com.au", suburb: "Beaudesert QLD" },
+    { name: "Brisbane City Haulage", abn: null, contactName: "Craig Donnelly", phone: "07 3277 4410", email: "craig@bchaulage.example.com.au", suburb: "Rocklea QLD" },
+    { name: "Darling Downs Grain Co", abn: null, contactName: "Bec Hartley", phone: "07 4632 8812", email: "fleet@ddgrain.example.com.au", suburb: "Toowoomba QLD" },
+    { name: "Lockyer Valley Earthmoving", abn: null, contactName: "Shane Pirie", phone: "0428 551 902", email: "shane@lvearthmoving.example.com.au", suburb: "Gatton QLD" },
+    { name: "Sunshine Coast Tippers", abn: null, contactName: "Narelle Brooks", phone: "07 5491 3307", email: "admin@sctippers.example.com.au", suburb: "Caloundra QLD" },
+    { name: "Scenic Rim Livestock Transport", abn: null, contactName: "Matt Cuthbert", phone: "0409 117 664", email: "matt@srlt.example.com.au", suburb: "Beaudesert QLD" },
   ]).returning();
   const CL = Object.fromEntries(clientRows.map((c) => [c.name, c.id]));
   const day0 = addDays(TODAY, -16);
@@ -88,33 +87,33 @@ async function main() {
   type JobDef = { code: string; name: string; client?: string; type?: string; start: string; due: string; quote?: number; parent?: string; desc: string;
     tasks: [string, string, number, number?][] }; // name, activity, std minutes, bay?
   const jobs: JobDef[] = [
-    { code: "J-24044", name: "Dog trailer build (4-axle)", client: "Scenic Rim Livestock Transport", start: addDays(day0, -10), due: addDays(TODAY, -4), quote: 64_800_00,
-      desc: "New 4-axle dog trailer to customer drawing DT-4A rev C.",
-      tasks: [["Cut & prep drawbar and chassis", "FAB", 960], ["Weld chassis & drawbar", "WELD", 1500], ["Fit axles & suspension", "FIT", 720], ["Blast & paint chassis", "PAINT", 900], ["Wire lights & EBS", "ELEC", 420], ["Final QA & handover", "QC", 180]] },
-    { code: "J-24047", name: "Tanker chassis crack repair", client: "Darling Downs Grain Co", start: addDays(day0, -4), due: addDays(TODAY, -8), quote: 9_850_00,
+    { code: "J-24044", name: "Converter dolly build (tandem, PBS)", client: "Scenic Rim Livestock Transport", start: addDays(day0, -10), due: addDays(TODAY, -4), quote: 64_800_00,
+      desc: "New tandem-axle converter dolly to drawing CD-2A rev C, PBS approved.",
+      tasks: [["Cut & prep drawbar and frame", "FAB", 960], ["Weld frame, drawbar & turntable mount", "WELD", 1500], ["Fit axles & suspension", "FIT", 720], ["Blast & paint chassis", "PAINT", 900], ["Wire lights & EBS", "ELEC", 420], ["Final QA & handover", "QC", 180]] },
+    { code: "J-24047", name: "Skel trailer chassis crack repair", client: "Darling Downs Grain Co", start: addDays(day0, -4), due: addDays(TODAY, -8), quote: 9_850_00,
       desc: "Repair cracked cross-members and re-certify.",
       tasks: [["Strip & inspect chassis", "FAB", 240], ["Weld repairs & gussets", "WELD", 600], ["Paint repaired areas", "PAINT", 240]] },
-    { code: "J-24051", name: "Tri-axle side tipper build", client: "Brisbane City Haulage", start: addDays(day0, 1), due: addDays(TODAY, 18), quote: 86_500_00,
-      desc: "New 32 ft tri-axle side tipper, Hardox body, to drawing ST-32 rev B.",
-      tasks: [["Cut & prep chassis rails", "FAB", 1500], ["Weld chassis & cross-members", "WELD", 3600], ["Fabricate tipper body", "FAB", 4800], ["Weld body seams", "WELD", 3600], ["Fit hydraulic ram & PTO", "HYD", 900], ["Abrasive blast & prime", "PAINT", 1500], ["Top coat", "PAINT", 1200], ["Wire lights & ABS", "ELEC", 720], ["Final QA & roadworthy check", "QC", 240]] },
-    { code: "J-24051-H", name: "Hydraulic kit for J-24051", client: "Brisbane City Haulage", parent: "J-24051", start: addDays(day0, 4), due: addDays(TODAY, 10),
-      desc: "Sub-job: hose kit, valve bank and controls for the side tipper.",
-      tasks: [["Assemble hose kit", "HYD", 360], ["Mount valve bank & controls", "HYD", 300]] },
+    { code: "J-24051", name: "Tri-axle curtainsider build (45 ft)", client: "Brisbane City Haulage", start: addDays(day0, 1), due: addDays(TODAY, 18), quote: 86_500_00,
+      desc: "New 45 ft tri-axle curtainsider to drawing CS-45 rev B. Customer spec: 2 × sliding gates, alloy deck.",
+      tasks: [["Cut & prep chassis rails", "FAB", 1500], ["Weld chassis & cross-members", "WELD", 3600], ["Fabricate deck & bulkheads", "FAB", 4800], ["Weld deck & gates", "WELD", 3600], ["Fit air suspension & axles", "HYD", 900], ["Abrasive blast & prime", "PAINT", 1500], ["Top coat", "PAINT", 1200], ["Wire lights & EBS", "ELEC", 720], ["Final QA & roadworthy check", "QC", 240]] },
+    { code: "J-24051-H", name: "Curtain & gantry kit for J-24051", client: "Brisbane City Haulage", parent: "J-24051", start: addDays(day0, 4), due: addDays(TODAY, 10),
+      desc: "Sub-job: gantry, curtain rails, curtains and buckles for the curtainsider.",
+      tasks: [["Assemble gantry & curtain rails", "HYD", 360], ["Fit curtains & buckles", "HYD", 300]] },
     { code: "J-24055", name: "Curtainsider body repair", client: "Darling Downs Grain Co", start: addDays(day0, 3), due: addDays(TODAY, 3), quote: 14_200_00,
       desc: "Accident repair, nearside. Insurance job.",
       tasks: [["Strip damaged panels", "FAB", 300], ["Replace side gates", "WELD", 540], ["Repair floor bearers", "WELD", 600], ["Re-spray nearside", "PAINT", 480], ["New curtains & fit-up", "FIT", 360]] },
-    { code: "J-24058", name: "Prime mover headboard & toolboxes", client: "Lockyer Valley Earthmoving", start: addDays(day0, 6), due: addDays(TODAY, 7), quote: 11_900_00,
+    { code: "J-24058", name: "Flat top headboard & toolboxes", client: "Lockyer Valley Earthmoving", start: addDays(day0, 6), due: addDays(TODAY, 7), quote: 11_900_00,
       desc: "Aluminium headboard, 2 × underbody toolboxes, LED beacons.",
       tasks: [["Fabricate headboard", "FAB", 960], ["Fabricate toolboxes (×2)", "FAB", 900], ["Weld & mount", "WELD", 720], ["Powder coat prep", "PAINT", 420], ["Fit lights & beacons", "ELEC", 420]] },
     { code: "J-24060", name: "Low loader ramp rebuild", client: "Sunshine Coast Tippers", start: addDays(day0, 9), due: addDays(TODAY, 12), quote: 8_400_00,
       desc: "Replace both ramps with heavier section, new springs and pins.",
       tasks: [["Remove old ramps", "FAB", 300], ["Fabricate new ramps", "WELD", 1500], ["Fit springs & pins", "FIT", 480], ["Paint ramps", "PAINT", 540]] },
-    { code: "J-24049", name: "Side loader refurbishment", client: "Scenic Rim Livestock Transport", start: addDays(day0, -2), due: addDays(TODAY, 9), quote: 27_600_00,
-      desc: "Strip, service and refurbish side loader crane; new hydraulic lines and controls.",
-      tasks: [["Strip down & inspect", "FIT", 900], ["Rebuild hydraulic cylinders", "HYD", 1800], ["Replace hydraulic lines", "HYD", 1500], ["Rewire controls & sensors", "ELEC", 1440], ["Reassemble & test", "FIT", 1200], ["Blast & repaint crane boom", "PAINT", 1200]] },
-    { code: "J-24053", name: "Service body fit-out (Isuzu NPR)", client: "Lockyer Valley Earthmoving", start: addDays(day0, 2), due: addDays(TODAY, 11), quote: 21_400_00,
-      desc: "Aluminium service body, crane mount, compressor and lighting.",
-      tasks: [["Mount subframe", "FIT", 900], ["Fit body & doors", "FIT", 1500], ["Install compressor & air lines", "HYD", 960], ["Wire body lighting & 12V", "ELEC", 1320], ["Paint & seal", "PAINT", 600], ["Pre-delivery check", "QC", 180]] },
+    { code: "J-24049", name: "Flat top refurbishment (45 ft)", client: "Scenic Rim Livestock Transport", start: addDays(day0, -2), due: addDays(TODAY, 9), quote: 27_600_00,
+      desc: "Strip and refurbish a 45 ft flat top: deck, air suspension, brake lines and lighting.",
+      tasks: [["Strip down & inspect", "FIT", 900], ["Rebuild air suspension", "HYD", 1800], ["Replace air & brake lines", "HYD", 1500], ["Rewire lights & EBS", "ELEC", 1440], ["Re-deck & reassemble", "FIT", 1200], ["Blast & repaint crane boom", "PAINT", 1200]] },
+    { code: "J-24053", name: "Skel trailer pair (20 ft + 40 ft)", client: "Lockyer Valley Earthmoving", start: addDays(day0, 2), due: addDays(TODAY, 11), quote: 21_400_00,
+      desc: "Two container skel trailers on stock frames: running gear, twist locks, air and lighting.",
+      tasks: [["Assemble running gear", "FIT", 900], ["Fit twist locks & landing legs", "FIT", 1500], ["Fit air & brake system", "HYD", 960], ["Wire lights & EBS", "ELEC", 1320], ["Paint & decal", "PAINT", 600], ["Pre-delivery check", "QC", 180]] },
     { code: "J-24057", name: "Fleet trailer inspections (×6)", client: "Brisbane City Haulage", start: addDays(day0, 5), due: addDays(TODAY, 6), quote: 7_800_00,
       desc: "Pre-rego inspections and minor repairs on six fleet trailers.",
       tasks: [["Brake & suspension checks", "FIT", 1080], ["Lighting & EBS checks", "ELEC", 720], ["Minor weld repairs", "WELD", 900], ["Touch-up paint after repairs", "PAINT", 720], ["Inspection reports", "QC", 240]] },
@@ -124,9 +123,9 @@ async function main() {
     { code: "J-24062", name: "B-double skel trailer modifications", client: "Brisbane City Haulage", start: TODAY, due: addDays(TODAY, 14), quote: 18_300_00,
       desc: "Add twist locks and extend landing legs. Starts today.",
       tasks: [["Cut out old twist lock mounts", "FAB", 240], ["Weld new twist lock mounts", "WELD", 480], ["Extend landing legs", "FAB", 300], ["Paint & decal", "PAINT", 240]] },
-    { code: "J-24063", name: "Water cart tank brackets", client: "Lockyer Valley Earthmoving", type: "customer", start: addDays(TODAY, 3), due: addDays(TODAY, 20), quote: 6_200_00,
+    { code: "J-24063", name: "Converter dollies × 2 (PBS)", client: "Lockyer Valley Earthmoving", type: "customer", start: addDays(TODAY, 3), due: addDays(TODAY, 20), quote: 6_200_00,
       desc: "Quoted, materials on order.",
-      tasks: [["Fabricate tank cradles", "FAB", 420], ["Weld & fit cradles", "WELD", 360]] },
+      tasks: [["Cut & prep frames", "FAB", 420], ["Weld frames & drawbars", "WELD", 360]] },
   ];
 
   const projectIds: Record<string, string> = {};
@@ -187,7 +186,7 @@ async function main() {
       siteId: site.id, departmentId: depts[p.dept], workPatternId: p.apprentice ? appShift.id : dayShift.id, award: AWARD,
       payRateCents: Math.round(p.pay * 100), costRateCents: Math.round(p.pay * (p.type === "casual" ? 1.25 : 1.38) * 100),
       pinHash: pinHash(String(1000 + p.code)), phone: `04${ri(10, 99)} ${ri(100, 999)} ${ri(100, 999)}`,
-      email: `${p.first.toLowerCase()}.${p.last.toLowerCase().replace(/[^a-z]/g, "")}@ironbarktrailers.example.com.au`,
+      email: `${p.first.toLowerCase()}.${p.last.toLowerCase().replace(/[^a-z]/g, "")}@akaal.example.com.au`,
       colour: p.colour, startDate: addDays(TODAY, -ri(120, 2400)),
     }).returning();
     emps.push({ ...p, id: e.id, patternId: e.workPatternId });
@@ -198,10 +197,10 @@ async function main() {
   for (const e of emps) if (e.id !== ben.id && e.dept === "Fabrication") await db.update(t.employees).set({ supervisorId: ben.id }).where(dsql`id = ${e.id}`);
 
   await db.insert(t.users).values([
-    { name: "Sarah Collins", email: "sarah@ironbarktrailers.example.com.au", role: "owner", title: "Managing Director" },
-    { name: "Mark Jensen", email: "mark@ironbarktrailers.example.com.au", role: "manager", title: "Workshop Manager" },
-    { name: "Ben Walker", email: "ben@ironbarktrailers.example.com.au", role: "supervisor", title: "Leading Hand, Fabrication", employeeId: ben.id },
-    { name: "Priya Raman", email: "priya@ironbarktrailers.example.com.au", role: "payroll", title: "Payroll & Accounts" },
+    { name: "Sarah Collins", email: "sarah@akaal.example.com.au", role: "owner", title: "Owner (demo user)" },
+    { name: "Mark Jensen", email: "mark@akaal.example.com.au", role: "manager", title: "Workshop Manager" },
+    { name: "Ben Walker", email: "ben@akaal.example.com.au", role: "supervisor", title: "Leading Hand, Fabrication", employeeId: ben.id },
+    { name: "Priya Raman", email: "priya@akaal.example.com.au", role: "payroll", title: "Payroll & Accounts" },
   ]);
   const mark = (await db.select().from(t.users).where(dsql`role = 'manager'`))[0];
 

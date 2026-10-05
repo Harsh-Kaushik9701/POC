@@ -1,8 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { BRAND } from "@/lib/brand";
 
 export const metadata: Metadata = {
-  title: { default: "Ironbark Shop Floor", template: "%s · Ironbark Shop Floor" },
+  title: { default: BRAND.appName, template: `%s · ${BRAND.appName}` },
   description: "Workshop time tracking: clock on/off, jobs, active vs idle time",
 };
 export const viewport: Viewport = { width: "device-width", initialScale: 1 };
