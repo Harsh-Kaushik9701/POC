@@ -79,6 +79,7 @@ export function FloorBoard({ initial, canAssign }: { initial: Floor; canAssign: 
         </div>
         <div className="row">
           <span className="clockchip">{hm(now)}</span>
+          <Link className="btn" href="/idle">Idle ranking</Link>
           <button className="btn" onClick={() => setTv(!tv)}>{tv ? "Exit TV mode" : "TV mode"}</button>
         </div>
       </div>

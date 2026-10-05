@@ -1,4 +1,4 @@
-import { and, isNull, gte, sql, ne } from "drizzle-orm";
+import { and, isNull, gte, sql, ne, eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { db, t } from "@/db";
 import { requireUser, clearSession } from "@/lib/session";
@@ -20,9 +20,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const user = await requireUser();
   const [{ n }] = await db.select({ n: sql<number>`count(*)::int` }).from(t.alerts)
     .where(and(isNull(t.alerts.ackAt), ne(t.alerts.severity, "info"), gte(t.alerts.workDate, addDays(todayLocal(), -7))));
+  const [{ idleNow }] = await db.select({ idleNow: sql<number>`count(*)::int` }).from(t.timeSegments)
+    .where(and(isNull(t.timeSegments.endAt), eq(t.timeSegments.kind, "unallocated")));
   const r = user.role;
   const items: NavItem[] = [{ group: "Today" }];
   if (can(r, "floor.view")) items.push({ href: "/floor", label: "Floor board" });
+  if (can(r, "floor.view")) items.push({ href: "/idle", label: "Idle workers", badge: idleNow });
   if (can(r, "exceptions.view")) items.push({ href: "/exceptions", label: "Exceptions", badge: n });
   items.push({ group: "Time" });
   if (can(r, "timesheets.view")) items.push({ href: "/timesheets", label: "Timesheets" });
