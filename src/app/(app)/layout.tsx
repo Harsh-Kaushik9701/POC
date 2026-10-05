@@ -6,6 +6,7 @@ import { can } from "@/lib/permissions";
 import { appNow, addDays, todayLocal } from "@/lib/time";
 import { ROLE_LABEL } from "@/lib/format";
 import { NavLinks, type NavItem } from "@/components/NavLinks";
+import { NavShell } from "@/components/NavShell";
 import { DemoClock } from "@/components/DemoClock";
 import { BRAND } from "@/lib/brand";
 
@@ -43,8 +44,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="shell">
-      <nav className="nav" aria-label="Main">
-        <div className="brand"><b><i>{BRAND.shortMark}</i>{BRAND.wordmark}<small>{BRAND.product}</small></b><span>{BRAND.company} · {BRAND.siteLabel}</span></div>
+      <NavShell alerts={n} brand={<div className="brand"><b><i>{BRAND.shortMark}</i>{BRAND.wordmark}<small>{BRAND.product}</small></b><span>{BRAND.company} · {BRAND.siteLabel}</span></div>}>
         <NavLinks items={items} />
         <div className="foot">
           <span className="mono"><DemoClock serverNow={appNow()} demo={!!process.env.DEMO_NOW} /></span>
@@ -52,7 +52,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <a href="/kiosk?device=kiosk-front-gate-demo" target="_blank" style={{ padding: 0, color: "var(--tape)" }}>Open kiosk ↗</a>
           <form action={logout}><button>Switch user</button></form>
         </div>
-      </nav>
+      </NavShell>
       <main className="main">{children}</main>
     </div>
   );
