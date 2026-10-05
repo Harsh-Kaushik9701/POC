@@ -30,6 +30,7 @@ async function main() {
     return;
   }
 
+  const REAL_START = Date.now();
   const NOW = appNow();
   const TODAY = localDate(NOW);
   const NOW_MIN = localMinutes(NOW);
@@ -375,7 +376,7 @@ async function main() {
     where work_date < ${thisMonday} and status = 'open'`);
   // Older alerts were dealt with.
   await db.execute(dsql`update alerts set ack_by = ${mark.id}, ack_at = opened_at + interval '20 minutes' where work_date < ${addDays(TODAY, -1)} and type <> 'auto_clock_off'`);
-  await db.insert(t.auditLog).values({ actorUserId: null, action: "seed", entity: "database", detail: { days: days.length, events: events.length } });
+  await db.insert(t.auditLog).values({ actorUserId: null, action: "seed", entity: "database", detail: { days: days.length, events: events.length, demoNow: process.env.DEMO_NOW ?? null, realStart: REAL_START } });
 
   console.log("Seed complete. Log in at http://localhost:3000 and open the kiosk at /kiosk?device=kiosk-front-gate-demo");
   await sqlClient.end();

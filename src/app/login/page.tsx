@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { checkHealth } from "@/server/health";
 import { db, t } from "@/db";
 import { setSession } from "@/lib/session";
 import { ROLE_LABEL } from "@/lib/format";
@@ -14,6 +15,8 @@ async function login(formData: FormData) {
 }
 
 export default async function LoginPage() {
+  const health = await checkHealth();
+  if (!health.ok) redirect("/status");
   const users = await db.select().from(t.users).orderBy(t.users.createdAt);
   const [org] = await db.select().from(t.organisation).limit(1);
   return (

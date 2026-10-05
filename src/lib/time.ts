@@ -76,18 +76,26 @@ export function minToHHMM(min: number): string {
 }
 
 /* ---------------- Demo clock ----------------
- * DEMO_NOW="2026-10-06 10:45" makes the app behave as if the server started at that Brisbane time.
- * The clock then runs forward in real time. The offset lives on globalThis so hot reloads keep it.
+ * DEMO_NOW="2026-10-06 10:45" makes the app behave as if it is that Brisbane time, with the clock running forward.
+ * The clock is anchored to the moment the demo data was loaded (stored by the seed script), so every server
+ * instance agrees — important on serverless hosts like Vercel, where many instances start at different times.
+ * Without an anchor (e.g. the seed script itself) it starts from when the process started.
  */
 const g = globalThis as unknown as { __demoOffset?: number };
+export function demoTarget(): number | null {
+  const m = (process.env.DEMO_NOW ?? "").trim().match(/^(\d{4}-\d{2}-\d{2})[ T](\d{1,2}):(\d{2})$/);
+  return m ? localToUtc(m[1], +m[2] * 60 + +m[3]) : null;
+}
+/** Anchor the demo clock: DEMO_NOW corresponds to the real instant `realMs`. */
+export function setDemoAnchor(realMs: number) {
+  const target = demoTarget();
+  if (target !== null) g.__demoOffset = target - realMs;
+}
 function demoOffset(): number {
   if (g.__demoOffset !== undefined) return g.__demoOffset;
-  const raw = (process.env.DEMO_NOW ?? "").trim();
-  let off = 0;
-  const m = raw.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{1,2}):(\d{2})$/);
-  if (m) off = localToUtc(m[1], +m[2] * 60 + +m[3]) - Date.now();
-  g.__demoOffset = off;
-  return off;
+  const target = demoTarget();
+  g.__demoOffset = target !== null ? target - Date.now() : 0;
+  return g.__demoOffset;
 }
 
 /** The app's "now" in UTC ms. Always use this instead of Date.now() on the server. */

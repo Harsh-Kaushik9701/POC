@@ -54,6 +54,22 @@ Workers don't log in. On the kiosk, the dashed **Demo fobs** panel simulates tap
 
 ---
 
+## Deploying to Vercel
+
+Vercel doesn't read your `.env` file. The database must be set up from your computer, and the settings added in Vercel.
+
+1. **Load the cloud database from your computer.** In `.env`, set `DATABASE_URL` to your Aiven Service URI (it ends in `?sslmode=require`). Then run `npm run db:reset`.
+2. **Add the settings in Vercel.** Go to Project → Settings → Environment Variables and add these for Production (and Preview):
+   - `DATABASE_URL`: the same Aiven URI.
+   - `SESSION_SECRET`: any long random text.
+   - `DEMO_NOW`: `2026-10-06 10:45`, the same value you seeded with.
+3. **Redeploy.** Deployments → ⋯ → Redeploy. A redeploy is needed because settings only apply to new deployments.
+4. **Check it.** Open `https://YOUR-APP.vercel.app/status`. It checks each step and says exactly what to fix.
+
+**Allowed IPs on Aiven.** Vercel's servers change address, so Aiven must accept connections from anywhere. In Aiven, open your service → Overview → Allowed IP addresses, and make sure `0.0.0.0/0` is there (it is by default).
+
+**Limits on Vercel.** Punch photos are stored only temporarily, because Vercel can't keep files; production should use S3-compatible storage. Background rules run when someone opens the floor board, or call `/api/v1/cron/sweep` from a Vercel Cron job every minute.
+
 ## A 5-minute demo script
 
 1. **Floor board** (log in as Mark). Ethan and Tom are at the top in red, idle for over 15 minutes, and their alerts have fired. Chloe is waiting on parts. Pick **J-24057-01** in the right panel and press **Assign** on Ethan.

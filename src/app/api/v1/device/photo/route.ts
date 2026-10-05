@@ -1,5 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { UPLOAD_DIR } from "@/lib/uploads";
 import { deviceFromRequest, deviceError } from "@/server/device";
 import { uuidv7 } from "@/lib/uuid";
 
@@ -10,7 +11,7 @@ export async function POST(req: Request) {
   const buf = Buffer.from(await req.arrayBuffer());
   if (buf.length < 100 || buf.length > 2_000_000 || buf[0] !== 0xff || buf[1] !== 0xd8) return Response.json({ error: "Expected a JPEG under 2 MB" }, { status: 400 });
   const key = `${uuidv7()}.jpg`;
-  const dir = path.join(process.cwd(), "uploads");
+  const dir = UPLOAD_DIR;
   await mkdir(dir, { recursive: true });
   await writeFile(path.join(dir, key), buf);
   return Response.json({ key });
