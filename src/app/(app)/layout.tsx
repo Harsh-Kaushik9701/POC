@@ -7,7 +7,7 @@ import { appNow, addDays, todayLocal } from "@/lib/time";
 import { ROLE_LABEL } from "@/lib/format";
 import { NavLinks, type NavItem } from "@/components/NavLinks";
 import { NavShell } from "@/components/NavShell";
-import { DemoClock } from "@/components/DemoClock";
+import { TopBar } from "@/components/TopBar";
 import { BRAND } from "@/lib/brand";
 
 async function logout() {
@@ -16,6 +16,10 @@ async function logout() {
   redirect("/login");
 }
 
+/**
+ * App shell, following the common enterprise pattern (SAP Fiori launchpad, Dynamics 365, NetSuite):
+ * a role-based side navigation, and a top bar with search, alerts and the user menu on every page.
+ */
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
   const [{ n }] = await db.select({ n: sql<number>`count(*)::int` }).from(t.alerts)
@@ -23,40 +27,40 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const [{ idleNow }] = await db.select({ idleNow: sql<number>`count(*)::int` }).from(t.timeSegments)
     .where(and(isNull(t.timeSegments.endAt), eq(t.timeSegments.kind, "unallocated")));
   const r = user.role;
-  const items: NavItem[] = [{ group: "Today" }];
-  if (can(r, "floor.view")) items.push({ href: "/floor", label: "Floor board" });
-  if (can(r, "floor.view")) items.push({ href: "/idle", label: "Idle workers", badge: idleNow });
-  if (can(r, "exceptions.view")) items.push({ href: "/exceptions", label: "Exceptions", badge: n });
-  items.push({ group: "Time" });
-  if (can(r, "timesheets.view")) items.push({ href: "/timesheets", label: "Timesheets" });
-  if (can(r, "jobsheets.view")) items.push({ href: "/jobsheets", label: "Jobsheets" });
-  if (can(r, "reports.view")) items.push({ href: "/reports", label: "Reports" });
-  if (can(r, "payroll.export")) items.push({ href: "/payroll", label: "Payroll export" });
-  if (can(r, "setup.jobs") || can(r, "setup.people")) {
-    items.push({ group: "Setup" });
-    if (can(r, "setup.jobs")) items.push({ href: "/setup/jobs", label: "Jobs & tasks" });
-    if (can(r, "setup.people")) items.push({ href: "/setup/staff", label: "Staff & fobs" });
-    if (can(r, "setup.system")) {
-      items.push({ href: "/setup/devices", label: "Devices" });
-      items.push({ href: "/setup/codes", label: "Activities & codes" });
-      items.push({ href: "/setup/rules", label: "Shifts & rules" });
-    }
-    if (can(r, "setup.jobs")) items.push({ href: "/setup/clients", label: "Clients" });
+
+  const items: NavItem[] = [{ href: "/home", label: "Home", icon: "home" }];
+  if (can(r, "floor.view")) {
+    items.push({ group: "Live" });
+    items.push({ href: "/floor", label: "Floor board", icon: "board" });
+    items.push({ href: "/idle", label: "Idle workers", icon: "idle", badge: idleNow });
   }
-  if (can(r, "audit.view")) items.push({ href: "/audit", label: "Audit log" });
+  if (can(r, "exceptions.view")) items.push({ href: "/exceptions", label: "Exceptions", icon: "alert", badge: n });
+  items.push({ group: "Time & jobs" });
+  if (can(r, "timesheets.view")) items.push({ href: "/timesheets", label: "Timesheets", icon: "timesheet" });
+  if (can(r, "jobsheets.view")) items.push({ href: "/jobsheets", label: "Jobsheets", icon: "jobsheet" });
+  if (can(r, "reports.view")) items.push({ href: "/reports", label: "Reports", icon: "reports" });
+  if (can(r, "payroll.export")) items.push({ href: "/payroll", label: "Payroll export", icon: "payroll" });
+  const settings: NavItem[] = [];
+  if (can(r, "setup.jobs")) settings.push({ href: "/setup/jobs", label: "Jobs & tasks", icon: "jobs" });
+  if (can(r, "setup.people")) settings.push({ href: "/setup/staff", label: "Staff & fobs", icon: "staff" });
+  if (can(r, "setup.jobs")) settings.push({ href: "/setup/clients", label: "Clients", icon: "clients" });
+  if (can(r, "setup.system")) {
+    settings.push({ href: "/setup/devices", label: "Devices", icon: "device" });
+    settings.push({ href: "/setup/codes", label: "Activities & codes", icon: "codes" });
+    settings.push({ href: "/setup/rules", label: "Shifts & rules", icon: "rules" });
+  }
+  if (can(r, "audit.view")) settings.push({ href: "/audit", label: "Audit log", icon: "audit" });
+  if (settings.length) items.push({ group: "Settings", collapsible: true, items: settings });
 
   return (
     <div className="shell">
       <NavShell alerts={n} brand={<div className="brand"><b><i>{BRAND.shortMark}</i>{BRAND.wordmark}<small>{BRAND.product}</small></b><span>{BRAND.company} · {BRAND.siteLabel}</span></div>}>
         <NavLinks items={items} />
-        <div className="foot">
-          <span className="mono"><DemoClock serverNow={appNow()} demo={!!process.env.DEMO_NOW} /></span>
-          <span><b>{user.name}</b><br />{ROLE_LABEL[user.role] ?? user.role}</span>
-          <a href="/kiosk?device=kiosk-front-gate-demo" target="_blank" style={{ padding: 0, color: "var(--tape)" }}>Open kiosk ↗</a>
-          <form action={logout}><button>Switch user</button></form>
-        </div>
       </NavShell>
-      <main className="main">{children}</main>
+      <div className="workarea">
+        <TopBar user={user.name} role={ROLE_LABEL[user.role] ?? user.role} alerts={n} serverNow={appNow()} demo={!!process.env.DEMO_NOW} logout={logout} />
+        <main className="main">{children}</main>
+      </div>
     </div>
   );
 }
