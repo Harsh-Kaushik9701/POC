@@ -74,3 +74,15 @@
 .k-seq li:last-child { border-bottom: 0; }
 .k-seq .dot { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
 @media (max-width: 600px) { .k-seq li { grid-template-columns: 96px 12px minmax(0, 1fr); } .k-seq li > :last-child { display: none; } }
+
+/* Tap receipt: what ended and what started, with times and durations */
+.k-receipt { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 8px; width: min(720px, 100%); text-align: left; }
+.k-receipt li { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 12px; align-items: center; background: rgba(0, 0, 0, .28); border-radius: 12px; padding: 12px 16px; }
+.k-receipt .ic { font-size: 18px; text-align: center; }
+.k-receipt .tx { display: grid; gap: 2px; min-width: 0; }
+.k-receipt .tx b { font-size: 19px; font-weight: 600; }
+.k-receipt .tx small { font-family: var(--f-mono); font-size: 14px; color: var(--k-muted); }
+.k-receipt .du { font-family: var(--f-mono); font-size: 26px; font-weight: 500; white-space: nowrap; }
+.k-receipt.compact li { background: var(--k-panel); border: 1px solid var(--k-line); padding: 10px 14px; }
+.k-receipt.compact .du { font-size: 20px; }
+@media (max-width: 600px) { .k-receipt .du { font-size: 18px; } .k-receipt .tx b { font-size: 16px; } }
